@@ -1,0 +1,402 @@
+:root {
+  color-scheme: dark;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f3f6f9;
+  --primary: #0d6efd;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.hero {
+  background: linear-gradient(135deg, #0d6efd 0%, #3b82f6 100%);
+}
+
+.hero .eyebrow {
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.85);
+  font-size: .8rem;
+  margin-bottom: .75rem;
+}
+
+.hero h1,
+.hero p {
+  color: #fff;
+}
+
+.hero-card {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 24px;
+}
+
+.card {
+  border-radius: 24px;
+}
+
+.card-title {
+  color: #111827;
+}
+
+#dashboardCards {
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-item {
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.badge {
+  min-width: 2rem;
+  font-size: .85rem;
+}
+
+.table-responsive {
+  margin-top: 1.5rem;
+}
+
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+
+/* ===== MODO FUTURISTA ITRACK ===== */
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(13,110,253,.15), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(0,255,255,.10), transparent 35%),
+    #050816;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Fondo animado */
+/* Luces gamer SOLO en bordes */
+body {
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* borde superior */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #00ffff,
+    #0d6efd,
+    #ff00ff,
+    transparent
+  );
+
+  background-size: 300%;
+  animation: edgeFlow 6s linear infinite;
+  z-index: 9999;
+}
+
+/* borde inferior */
+body::after {
+  content: "";
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ff00ff,
+    #00ffff,
+    #0d6efd,
+    transparent
+  );
+
+  background-size: 300%;
+  animation: edgeFlow 6s linear infinite;
+  z-index: 9999;
+}
+
+@keyframes edgeFlow {
+  0% {
+    background-position: 0%;
+  }
+
+  100% {
+    background-position: 300%;
+  }
+}
+
+@keyframes futuristicMove {
+  from {
+    transform: translateX(-30%) rotate(20deg);
+  }
+
+  to {
+    transform: translateX(30%) rotate(20deg);
+  }
+}
+
+/* HERO futurista */
+.hero {
+  background:
+    linear-gradient(
+      135deg,
+      #020617,
+      #0f172a,
+      #111827
+    ) !important;
+
+  border-bottom: 1px solid rgba(0,255,255,.2);
+
+  box-shadow:
+    0 0 40px rgba(0,255,255,.15);
+}
+
+/* tarjetas glass */
+.card,
+.hero-card {
+  background: rgba(255,255,255,.05) !important;
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(0,255,255,.12) !important;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* borde animado */
+.card::before,
+.hero-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  padding: 1px;
+  background: linear-gradient(
+    90deg,
+    #00e5ff,
+    #0d6efd,
+    #00e5ff
+  );
+
+  background-size: 300%;
+  animation: borderFlow 4s linear infinite;
+  opacity: 0.4;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes borderFlow {
+  0% {
+    background-position: 0%;
+  }
+
+  100% {
+    background-position: 300%;
+  }
+}
+
+/* glow hover */
+.card:hover,
+.hero-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 0 25px rgba(0,255,255,.18);
+
+  transition: .3s ease;
+}
+
+/* botones */
+.btn-primary {
+  background:
+    linear-gradient(
+      90deg,
+      #0d6efd,
+      #00c6ff
+    ) !important;
+
+  border: none !important;
+
+  box-shadow:
+    0 0 18px rgba(13,110,253,.35);
+}
+
+.btn-outline-light {
+  border: 1px solid #00d9ff !important;
+  color: #00d9ff !important;
+}
+
+.btn-outline-light:hover {
+  background: #00d9ff !important;
+  color: #000 !important;
+
+  box-shadow:
+    0 0 20px rgba(0,217,255,.5);
+}
+
+/* dashboard cards */
+.dashboard-item {
+  background:
+    rgba(255,255,255,.06) !important;
+
+  border:
+    1px solid rgba(0,255,255,.15);
+
+  box-shadow:
+    0 0 15px rgba(0,255,255,.08);
+}
+
+/* textos */
+.card-title,
+h1,
+h2,
+h3,
+h4,
+h5 {
+  color: #d9f8ff !important;
+  text-shadow: 0 0 10px rgba(0,217,255,.12);
+}
+
+.text-muted {
+  color: #b4c8df !important;
+}
+
+/* tablas */
+.table {
+  color: #dbeafe !important;
+}
+
+.table thead {
+  background:
+    rgba(13,110,253,.2);
+}
+
+.table-hover tbody tr:hover {
+  background:
+    rgba(0,255,255,.08);
+}
+
+
+#contentArea,
+.card-body {
+  position: relative;
+  z-index: 2;
+}
+
+
+/* ===== RGB EN LOS BORDES TIPO SETUP GAMER ===== */
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+
+  background:
+    linear-gradient(90deg,
+      #00e5ff,
+      #0d6efd,
+      #8a2be2,
+      #ff00ff,
+      #00e5ff);
+
+  background-size: 300% 300%;
+  animation: borderRGB 6s linear infinite;
+
+  opacity: 0.8;
+
+  /* SOLO bordes */
+  clip-path: polygon(
+    0 0, 100% 0, 100% 8px, 0 8px,
+    0 calc(100% - 8px), 100% calc(100% - 8px),
+    100% 100%, 0 100%,
+    0 calc(100% - 8px), 8px calc(100% - 8px),
+    8px 8px, calc(100% - 8px) 8px,
+    calc(100% - 8px) calc(100% - 8px),
+    8px calc(100% - 8px),
+    8px 100%, 0 100%
+  );
+
+  box-shadow:
+    0 0 12px rgba(0,229,255,.5),
+    0 0 25px rgba(13,110,253,.35);
+}
+
+@keyframes borderRGB {
+  0% {
+    background-position: 0%;
+  }
+
+  100% {
+    background-position: 300%;
+  }
+}
+
+
+
+.dashboard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 12px;
+  border-radius: 14px;
+
+  background: rgba(0,255,255,.05);
+  border: 1px solid rgba(0,255,255,.12);
+
+  color: #d9f8ff;
+
+  box-shadow:
+    0 0 12px rgba(0,255,255,.08);
+}
+
+.status-line strong {
+  color: #00e5ff;
+}
+
+
+.logo-pedregal {
+  width: 180px;
+  max-width: 100%;
+  object-fit: contain;
+
+  filter:
+    drop-shadow(0 0 15px rgba(0,255,255,.25));
+
+  transition: .3s ease;
+}
+
+.logo-pedregal:hover {
+  transform: scale(1.05);
+
+  filter:
+    drop-shadow(0 0 25px rgba(0,255,255,.55));
+}
