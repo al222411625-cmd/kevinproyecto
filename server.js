@@ -4,24 +4,14 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
+const sendMail = require("./mailer");
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('MongoDB conectado');
 
-    await crearUsuariosIniciales();
+    await crearUsuariosIniciales();0
 
     app.listen(PORT, () => {
       console.log(`ITrack server escuchando en http://localhost:${PORT}`);
@@ -614,6 +604,8 @@ app.post('/api/reportes',
 
         console.log("EMAIL_USER:", process.env.EMAIL_USER);
 console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "OK" : "FALTA");
+
+console.log("ENTRO AL REPORTE");
 await sendMail(
   process.env.EMAIL_USER, // correo admin
   "🔴 Nuevo reporte de máquina - ITrack",
@@ -665,9 +657,4 @@ app.use((req, res) => {
   res.status(404).send('Recurso no encontrado');
 });
 
-const sendMail = require("./mailer");
-sendMail(
-  "al222411625@gmail.com",
-  "Prueba ITrack",
-  "<h1>Correo funcionando 🚀</h1>"
-);
+
