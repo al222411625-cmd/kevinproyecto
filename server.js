@@ -610,6 +610,19 @@ app.post('/api/reportes',
           fecha: new Date().toLocaleDateString(),
           estado: 'Pendiente'
         });
+await sendMail(
+  process.env.EMAIL_USER, // correo admin
+  "🔴 Nuevo reporte de máquina - ITrack",
+  `
+  <h2>Nuevo reporte recibido</h2>
+
+  <p><b>Equipo:</b> ${req.body.equipo}</p>
+  <p><b>Problema:</b> ${req.body.problema}</p>
+  <p><b>Descripción:</b> ${req.body.descripcion}</p>
+  <p><b>Usuario:</b> ${req.session.user.nombre}</p>
+  <p><b>Fecha:</b> ${new Date().toLocaleString()}</p>
+  `
+);
 
       res.status(201).json(nuevoReporte);
 
@@ -648,4 +661,9 @@ app.use((req, res) => {
   res.status(404).send('Recurso no encontrado');
 });
 
-
+const sendMail = require("./mailer");
+sendMail(
+  "al222411625@gmail.com",
+  "Prueba ITrack",
+  "<h1>Correo funcionando 🚀</h1>"
+);
