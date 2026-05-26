@@ -610,6 +610,10 @@ app.post('/api/reportes',
           fecha: new Date().toLocaleDateString(),
           estado: 'Pendiente'
         });
+
+
+        console.log("EMAIL_USER:", process.env.EMAIL_USER);
+console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "OK" : "FALTA");
 await sendMail(
   process.env.EMAIL_USER, // correo admin
   "🔴 Nuevo reporte de máquina - ITrack",
