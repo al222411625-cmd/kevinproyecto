@@ -523,17 +523,19 @@ async function loadActivos() {
 
     const rows = activos.map(activo => `
       <tr>
-        <td>${activo.id}</td>
+        <td>${activo._id}</td>
         <td>${activo.categoria}</td>
         <td>${activo.tipo}</td>
         <td>${activo.marca}</td>
         <td>${activo.serial}</td>
         <td>${activo.estado}</td>
         <td>${activo.area}</td>
-        ${canDelete ? `<td><button class="btn btn-sm btn-danger" onclick="deleteRecord('/api/activos', ${activo.id}, loadActivos)">Eliminar</button></td>` : ''}
+        ${canDelete ? `<td><button class="btn btn-sm btn-danger" onclick="deleteRecord('/api/activos', '${activo._id}', loadActivos)"">Eliminar</button></td>` : ''}
       </tr>
+      
     `).join('');
 
+    
     contentArea.innerHTML = `
       ${createTable(
         'Inventario de equipos',
@@ -550,23 +552,39 @@ async function loadActivos() {
         { id: 'area', label: 'Área', type: 'text', placeholder: 'Finanzas, Redes', required: true }
       ], 'formActivos', 'Registrar activo') : ''}
     `;
+if (canAdd) {
+  document
+    .getElementById('formActivos')
+    .addEventListener('submit', async event => {
 
-    if (canAdd) {
-      document.getElementById('formActivos').addEventListener('submit', async event => {
-        event.preventDefault();
-        const formData = new FormData(event.target);
-        const payload = {
+      event.preventDefault();
+
+      const formData = new FormData(event.target);
+
+      try {
+
+        await postApi('/api/activos', {
           categoria: formData.get('categoria'),
           tipo: formData.get('tipo'),
           marca: formData.get('marca'),
           serial: formData.get('serial'),
           estado: formData.get('estado'),
           area: formData.get('area')
-        };
-        await postApi('/api/activos', payload);
+        });
+
+        alert('Activo registrado correctamente ✅');
+
         loadActivos();
-      });
-    }
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert('No se pudo registrar el activo');
+      }
+    });
+}
+    
   } catch (error) {
     setRequestError('No se pudo cargar los activos. Intenta nuevamente.');
   }
@@ -771,37 +789,44 @@ async function loadMantenimientosData() {
       ` : ''}
     `;
 
-    if (canAdd) {
-      document
-        .getElementById('formMantenimientos')
-        .addEventListener('submit', async event => {
+if (canAdd) {
+  document
+    .getElementById('formMantenimientos')
+    .addEventListener('submit', async event => {
 
-          event.preventDefault();
+      event.preventDefault();
 
-          const payload = {
-            activoId:
-              document.getElementById('activoId').value,
+      try {
 
-            fecha:
-              new Date().toISOString().split('T')[0],
+        await postApi('/api/reportes', {
+          activoId:
+            document.getElementById('activoId').value,
 
-            tipo:
-              document.getElementById('tipo').value,
+          equipo:
+            document.getElementById('activoId')
+              .options[
+                document.getElementById('activoId').selectedIndex
+              ].text,
 
-            responsable:
-              currentUser.nombre,
+          problema:
+            document.getElementById('tipo').value,
 
-            descripcion:
-              document.getElementById('descripcion').value
-          };
-
-          await postApi('/api/mantenimientos', payload);
-
-          alert('Reporte enviado correctamente');
-
-          loadMantenimientosData();
+          descripcion:
+            document.getElementById('descripcion').value
         });
-    }
+
+        alert('Reporte enviado correctamente ✅');
+
+        loadMantenimientosData();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert('No se pudo enviar el reporte');
+      }
+    });
+}
 
   } catch (error) {
     setRequestError(

@@ -3,24 +3,46 @@ const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
+console.log("Mongo URI:", process.env.MONGODB_URI);
 const mongoose = require('mongoose');
 const sendMail = require("./mailer");
 const app = express();
 const PORT = process.env.PORT || 3000;
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+transporter.verify((error, success) => {
+  if (error) {
+    console.log('❌ Error Gmail:', error);
+  } else {
+    console.log('✅ Gmail listo');
+  }
+});
 mongoose.connect(process.env.MONGODB_URI)
-  .then(async () => {
-    console.log('MongoDB conectado');
+.then(async () => {
 
-    await crearUsuariosIniciales();0
+  console.log('✅ MongoDB conectado');
 
-    app.listen(PORT, () => {
-      console.log(`ITrack server escuchando en http://localhost:${PORT}`);
-    });
-  })
-  .catch(err => {
-    console.error('Error conectando a MongoDB:', err);
+  await crearUsuariosIniciales();
+
+  app.listen(PORT, () => {
+    console.log(`✅ ITrack server escuchando en http://localhost:${PORT}`);
   });
 
+})
+.catch(err => {
+
+  console.error('❌ Error conectando MongoDB');
+  console.error(err.message);
+
+});
 // MODELOS MONGODB
 
 const activoSchema = new mongoose.Schema({
@@ -54,6 +76,7 @@ const reporteSchema = new mongoose.Schema({
   activoId: String,
   equipo: String,
   usuario: String,
+  correoUsuario: String,
   problema: String,
   descripcion: String,
   fecha: String,
@@ -79,7 +102,7 @@ const AuthUser = mongoose.model('AuthUser', authUserSchema);
 
 app.use(express.json());
 app.use(session({
-  secret: 'itrack-secret-key-2026',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -195,6 +218,11 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    if (!username || !password) {
+  return res.status(400).json({
+    error: 'Faltan datos'
+  });
+}
 
     const user = await AuthUser.findOne({
       username: username.toLowerCase()
@@ -244,30 +272,6 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/auth-status', (req, res) => {
   res.json({ authenticated: Boolean(req.session && req.session.user), user: req.session?.user || null });
-});
-
-app.get('/api/activos', requireAuth, async (req, res) => {
-  try {
-    const tipo = req.query.tipo;
-
-    let activos;
-
-    if (tipo) {
-      activos = await Activo.find({
-        categoria: new RegExp(tipo, 'i')
-      });
-    } else {
-      activos = await Activo.find();
-    }
-
-    res.json(activos);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: 'Error obteniendo activos'
-    });
-  }
 });
 
 
@@ -381,20 +385,26 @@ app.get('/api/activos', requireAuth, async (req, res) => {
     });
   }
 });
+app.post('/api/activos',
+  requireAuth,
+  requireRole('admin', 'technician'),
+  async (req, res) => {
 
-app.post('/api/activos', requireAuth, async (req, res) => {
-  try {
-    const nuevoActivo = await Activo.create(req.body);
+    try {
 
-    res.status(201).json(nuevoActivo);
+      const nuevoActivo =
+        await Activo.create(req.body);
 
-  } catch (error) {
-    console.error(error);
+      res.status(201).json(nuevoActivo);
 
-    res.status(500).json({
-      error: 'Error creando activo'
-    });
-  }
+    } catch (error) {
+
+      console.error(error);
+
+      res.status(500).json({
+        error: 'Error creando activo'
+      });
+    }
 });
 
 app.put('/api/activos/:id',
@@ -456,7 +466,8 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       categoria: 'Switch'
     });
 
-    const totalUsuarios = await Usuario.countDocuments();
+  const totalUsuarios =
+  await AuthUser.countDocuments();
     const totalAreas = await Area.countDocuments();
     const totalMantenimientos = await Mantenimiento.countDocuments();
 
@@ -525,62 +536,107 @@ app.post('/api/mantenimientos',
     }
 });
 
-app.put('/api/activos/:id', requireAuth, requireRole('admin', 'technician'), async (req, res) => {
-  try {
-    const activo = await Activo.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
 
-    if (!activo) {
-      return res.status(404).json({ error: 'Activo no encontrado' });
+app.delete('/api/usuarios/:id',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res) => {
+
+    try {
+
+      const eliminado =
+        await Usuario.findByIdAndDelete(req.params.id);
+
+      if (!eliminado) {
+        return res.status(404).json({
+          error: 'Usuario no encontrado'
+        });
+      }
+
+      res.json(eliminado);
+
+    } catch (error) {
+
+      res.status(500).json({
+        error: error.message
+      });
     }
-
-    res.json(activo);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 });
 
-app.delete('/api/usuarios/:id', requireAuth, requireRole('admin'), (req, res) => {
-  const id = Number(req.params.id);
-  const index = usuarios.findIndex(item => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Usuario no encontrado' });
-  const deleted = usuarios.splice(index, 1);
-  res.json(deleted[0]);
+app.delete('/api/areas/:id',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res) => {
+
+    try {
+
+      const eliminada =
+        await Area.findByIdAndDelete(req.params.id);
+
+      if (!eliminada) {
+        return res.status(404).json({
+          error: 'Área no encontrada'
+        });
+      }
+
+      res.json(eliminada);
+
+    } catch (error) {
+
+      res.status(500).json({
+        error: error.message
+      });
+    }
 });
 
-app.delete('/api/areas/:id', requireAuth, requireRole('admin'), (req, res) => {
-  const id = Number(req.params.id);
-  const index = areas.findIndex(item => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Área no encontrada' });
-  const deleted = areas.splice(index, 1);
-  res.json(deleted[0]);
-});
+app.delete('/api/mantenimientos/:id',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res) => {
 
-app.delete('/api/mantenimientos/:id', requireAuth, (req, res) => {
-  const id = Number(req.params.id);
-  const index = mantenimientos.findIndex(item => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Mantenimiento no encontrado' });
-  const deleted = mantenimientos.splice(index, 1);
-  res.json(deleted[0]);
+    try {
+
+      const eliminado =
+        await Mantenimiento.findByIdAndDelete(
+          req.params.id
+        );
+
+      if (!eliminado) {
+        return res.status(404).json({
+          error: 'Mantenimiento no encontrado'
+        });
+      }
+
+      res.json(eliminado);
+
+    } catch (error) {
+
+      res.status(500).json({
+        error: error.message
+      });
+    }
 });
 
 app.get('/api/test-email', async (req, res) => {
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
-      subject: 'Prueba de correo ITrack',
-      html: '<h1>Si ves esto, el correo funciona ✅</h1>'
+
+    await sendMail(
+      process.env.EMAIL_USER,
+      'Prueba de correo ITrack',
+      '<h1>Si ves esto, el correo funciona ✅</h1>'
+    );
+
+    res.json({
+      message: 'Correo enviado'
     });
 
-    res.json({ message: 'Correo enviado' });
-
   } catch (error) {
+
     console.error(error);
-    res.status(500).json({ error: 'Error enviando correo' });
+
+    res.status(500).json({
+      error: 'Error enviando correo'
+    });
   }
 });
 
@@ -589,17 +645,27 @@ app.post('/api/reportes',
   async (req, res) => {
 
     try {
+      if (
+  !req.body.equipo ||
+  !req.body.problema ||
+  !req.body.descripcion
+) {
+  return res.status(400).json({
+    error: 'Faltan datos del reporte'
+  });
+}
 
-      const nuevoReporte =
-        await Reporte.create({
-          activoId: req.body.activoId,
-          equipo: req.body.equipo,
-          problema: req.body.problema,
-          descripcion: req.body.descripcion,
-          usuario: req.session.user.nombre,
-          fecha: new Date().toLocaleDateString(),
-          estado: 'Pendiente'
-        });
+     const nuevoReporte =
+  await Reporte.create({
+    activoId: req.body.activoId,
+    equipo: req.body.equipo,
+    problema: req.body.problema,
+    descripcion: req.body.descripcion,
+    usuario: req.session.user.nombre,
+    correoUsuario: req.body.correoUsuario,
+    fecha: new Date().toLocaleDateString(),
+    estado: 'Pendiente'
+  });
 
 
         console.log("EMAIL_USER:", process.env.EMAIL_USER);
@@ -607,16 +673,22 @@ console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "OK" : "FALTA");
 
 console.log("ENTRO AL REPORTE");
 await sendMail(
-  process.env.EMAIL_USER, // correo admin
+  process.env.EMAIL_USER,
   "🔴 Nuevo reporte de máquina - ITrack",
   `
-  <h2>Nuevo reporte recibido</h2>
+  <div style="font-family: Arial; padding:20px;">
+    <h2>Nuevo reporte recibido</h2>
 
-  <p><b>Equipo:</b> ${req.body.equipo}</p>
-  <p><b>Problema:</b> ${req.body.problema}</p>
-  <p><b>Descripción:</b> ${req.body.descripcion}</p>
-  <p><b>Usuario:</b> ${req.session.user.nombre}</p>
-  <p><b>Fecha:</b> ${new Date().toLocaleString()}</p>
+    <p><b>Equipo:</b> ${req.body.equipo}</p>
+    <p><b>Problema:</b> ${req.body.problema}</p>
+    <p><b>Descripción:</b> ${req.body.descripcion}</p>
+    <p><b>Usuario:</b> ${req.session.user.nombre}</p>
+    <p><b>Fecha:</b> ${new Date().toLocaleString()}</p>
+
+    <hr>
+
+    <p>Revisa el reporte en ITrack.</p>
+  </div>
   `
 );
 
@@ -633,6 +705,8 @@ await sendMail(
 });
 
 app.get('/api/reportes',
+
+  
   requireAuth,
   async (req, res) => {
 
@@ -651,6 +725,67 @@ app.get('/api/reportes',
     }
 });
 
+app.put('/api/reportes/:id/solucionar',
+  requireAuth,
+  requireRole('admin', 'technician'),
+  async (req, res) => {
+
+    try {
+
+      const reporte =
+        await Reporte.findById(req.params.id);
+
+      if (!reporte) {
+        return res.status(404).json({
+          error: 'Reporte no encontrado'
+        });
+      }
+
+      reporte.estado = 'Solucionado';
+
+      await reporte.save();
+
+      // Enviar correo al usuario
+      if (reporte.correoUsuario) {
+
+        await sendMail(
+          reporte.correoUsuario,
+          '✅ Tu reporte fue solucionado - ITrack',
+          `
+          <div style="font-family: Arial; padding:20px;">
+            <h2>Tu reporte ya fue solucionado</h2>
+
+            <p><b>Equipo:</b> ${reporte.equipo}</p>
+            <p><b>Problema:</b> ${reporte.problema}</p>
+
+            <p>
+              El equipo de soporte ya atendió tu incidencia.
+            </p>
+
+            <hr>
+
+            <p>Gracias por usar ITrack.</p>
+          </div>
+          `
+        );
+
+        console.log('Correo de solución enviado');
+      }
+
+      res.json({
+        success: true,
+        reporte
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      res.status(500).json({
+        error: 'Error solucionando reporte'
+      });
+    }
+});
 
 
 app.use((req, res) => {
