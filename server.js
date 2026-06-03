@@ -9,6 +9,35 @@ const sendMail = require("./mailer");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const nodemailer = require('nodemailer');
+const multer = require('multer');
+
+// Configuración para almacenar los archivos en la carpeta de subidas
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/uploads/'); 
+  },
+  filename: function (req, file, cb) {
+    // Esto les cambia el nombre por la fecha actual para que no se dupliquen
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// Configuración de almacenamiento de archivos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/uploads/'); // Los archivos se guardarán en esta carpeta
+  },
+  filename: function (req, file, cb) {
+    // Esto renombra el archivo con la fecha actual para que no se dupliquen nombres
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   port: 587,
@@ -83,6 +112,7 @@ const reporteSchema = new mongoose.Schema({
   problema: String,
   descripcion: String,
   fecha: String,
+  archivo: String,
   estado: {
     type: String,
     default: 'Pendiente'
@@ -644,6 +674,7 @@ app.get('/api/test-email', async (req, res) => {
 });
 app.post('/api/reportes',
   requireAuth,
+  upload.single('archivo'), // <-- Intercepta la foto del formulario
   async (req, res) => {
     try {
       if (!req.body.equipo || !req.body.problema || !req.body.descripcion) {
@@ -651,6 +682,10 @@ app.post('/api/reportes',
           error: 'Faltan datos del reporte'
         });
       }
+
+      // Si subieron foto guardamos su ruta, si no, se queda vacía
+      const rutaArchivo = req.file ? `/uploads/${req.file.filename}` : '';
+
       const nuevoReporte = await Reporte.create({
         activoId: req.body.activoId,
         equipo: req.body.equipo,
@@ -659,6 +694,7 @@ app.post('/api/reportes',
         usuario: req.session.user.nombre,
         correoUsuario: req.body.correoUsuario || '',
         fecha: new Date().toLocaleDateString(),
+        archivo: rutaArchivo, // <-- Se guarda en MongoDB Atlas
         estado: 'Pendiente'
       });
 
@@ -669,6 +705,7 @@ app.post('/api/reportes',
         responsable: req.session.user.nombre,
         descripcion: req.body.descripcion
       });
+
       return res.status(201).json(nuevoReporte);
     } catch (error) {
       console.error(error);

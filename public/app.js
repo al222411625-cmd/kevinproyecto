@@ -554,35 +554,32 @@ async function loadActivos() {
     `;
 if (canAdd) {
   document
-    .getElementById('formActivos')
-    .addEventListener('submit', async event => {
+        .getElementById('formMantenimientos')
+        .addEventListener('submit', async event => {
+          event.preventDefault();
 
-      event.preventDefault();
+          try {
+            const activoSelect = document.getElementById('activoId');
+            const equipoTexto = activoSelect.options[activoSelect.selectedIndex].text;
 
-      const formData = new FormData(event.target);
+            await postApi('/api/reportes', {
+              activoId: activoSelect.value,
+              equipo: equipoTexto,
+              problema: document.getElementById('tipo').value,
+              descripcion: document.getElementById('descripcion').value,
+              correoUsuario: currentUser ? currentUser.username + "@dominio.com" : ""
+            });
 
-      try {
+            alert('Reporte enviado correctamente ✅');
+            
+            document.getElementById('formMantenimientos').reset();
+            loadMantenimientosData();
 
-        await postApi('/api/activos', {
-          categoria: formData.get('categoria'),
-          tipo: formData.get('tipo'),
-          marca: formData.get('marca'),
-          serial: formData.get('serial'),
-          estado: formData.get('estado'),
-          area: formData.get('area')
+          } catch (error) {
+            console.error(error);
+            alert('No se pudo enviar el reporte');
+          }
         });
-
-        alert('Activo registrado correctamente ✅');
-
-        loadActivos();
-
-      } catch (error) {
-
-        console.error(error);
-
-        alert('No se pudo registrar el activo');
-      }
-    });
 }
     
   } catch (error) {
@@ -681,160 +678,133 @@ async function loadAreasData() {
 }
 
 async function loadMantenimientosData() {
+  dashboardCards.innerHTML = '';
   try {
     const mantenimientos = await fetchApi('/api/mantenimientos');
     const activos = await fetchApi('/api/activos');
 
-    const canDelete = isRole('admin');
-    const canAdd = isRole('admin', 'technician', 'user');
-
-    const headers = [
-      'ID',
-      'Activo',
-      'Fecha',
-      'Tipo',
-      'Responsable',
-      'Descripción'
-    ];
-
-    if (canDelete) headers.push('Acción');
-
-    const rows = mantenimientos.map(m => `
-      <tr>
-        <td>${m._id}</td>
-        <td>${m.activoId}</td>
-        <td>${m.fecha}</td>
-        <td>${m.tipo}</td>
-        <td>${m.responsable}</td>
-        <td>${m.descripcion}</td>
-        ${canDelete ? `
-          <td>
-            <button class="btn btn-sm btn-danger"
-              onclick="deleteRecord('/api/mantenimientos', '${m._id}', loadMantenimientosData)">
-              Eliminar
-            </button>
-          </td>
-        ` : ''}
-      </tr>
-    `).join('');
+    const canAdd = currentUser && (currentUser.role === 'admin' || currentUser.role === 'technician' || currentUser.role === 'user');
 
     contentArea.innerHTML = `
-      ${createTable(
-        'Mantenimientos programados',
-        'Historial y reportes de fallas de los equipos.',
-        headers,
-        rows
-      )}
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Mantenimientos Programados</h2>
+      </div>
+
+      <div class="table-responsive bg-surface p-3 rounded-4 shadow-sm mb-4">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Equipo / Activo</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Responsable</th>
+              <th>Descripción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${mantenimientos.map(m => {
+              // Corrección de coincidencia: Compara convirtiendo ambos valores a String
+              const activo = activos.find(a => String(a._id) === String(m.activoId));
+              
+              return `
+                <tr>
+                  <td>
+                    <strong>${activo ? activo.categoria : 'Equipo'}</strong><br>
+                    <small class="text-muted">${activo ? `${activo.marca} - ${activo.serial}` : 'Reporte General'}</small>
+                  </td>
+                  <td>${m.fecha}</td>
+                  <td><span class="badge bg-warning text-dark">${m.tipo}</span></td>
+                  <td>${m.responsable}</td>
+                  <td>${m.descripcion}</td>
+                </tr>
+              `;
+            }).join('')}
+            ${mantenimientos.length === 0 ? '<tr><td colspan="5" class="text-center text-muted py-4">No hay mantenimientos programados.</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
 
       ${canAdd ? `
-      <div class="mt-4">
-        <h4>Levantar reporte</h4>
-
+      <div class="card p-4 border-0 shadow-sm rounded-4">
+        <h4 class="mb-3">Reportar Falla / Programar Mantenimiento</h4>
         <form id="formMantenimientos">
-
           <div class="mb-3">
-            <label class="form-label">
-              Selecciona la máquina
-            </label>
-
-            <select class="form-control"
-              id="activoId"
-              required>
-
-              <option value="">
-                Selecciona un equipo
-              </option>
-
-              ${activos.map(a => `
-                <option value="${a._id}">
-                  ${a.tipo} - ${a.marca} (${a.area})
-                </option>
-              `).join('')}
-
+            <label for="activoId" class="form-label">Seleccionar Equipo Afectado</label>
+            <select class="form-select" id="activoId" required>
+              <option value="">-- Selecciona un activo de la lista --</option>
+              ${activos.map(a => `<option value="${a._id}">${a.categoria} - ${a.marca} (${a.serial})</option>`).join('')}
             </select>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label">
-              Tipo de problema
-            </label>
-
-            <input
-              type="text"
-              class="form-control"
-              id="tipo"
-              placeholder="No enciende, lenta, internet, monitor..."
-              required>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="tipo" class="form-label">Tipo de Problema</label>
+              <input type="text" class="form-control" id="tipo" placeholder="Ej: Pantalla rota, No enciende" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="descripcion" class="form-label">Descripción detallada</label>
+              <textarea class="form-control" id="descripcion" rows="1" placeholder="Describe lo que sucede..." required></textarea>
+            </div>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label">
-              Describe el problema
-            </label>
-
-            <textarea
-              class="form-control"
-              id="descripcion"
-              rows="3"
-              required></textarea>
-          </div>
-
-          <button type="submit"
-            class="btn btn-primary">
+          <button type="submit" class="btn btn-primary rounded-pill px-4">
             Enviar reporte
           </button>
-
         </form>
       </div>
+      <div class="mb-3">
+  <label for="archivoInput" class="form-label">Adjuntar Evidencia / Foto (Opcional)</label>
+  <input type="file" class="form-data form-control" id="archivoInput" accept="image/*,application/pdf">
+</div>
       ` : ''}
     `;
+    if (canAdd) {
+      document
+        .getElementById('formMantenimientos')
+        .addEventListener('submit', async event => {
+          event.preventDefault();
 
-if (canAdd) {
-  document
-    .getElementById('formMantenimientos')
-    .addEventListener('submit', async event => {
+          try {
+            const activoSelect = document.getElementById('activoId');
+            const equipoTexto = activoSelect.options[activoSelect.selectedIndex].text;
+            const archivoInput = document.getElementById('archivoInput');
 
-      event.preventDefault();
+            // Usamos FormData para empaquetar texto e imágenes juntos
+            const formData = new FormData();
+            formData.append('activoId', activoSelect.value);
+            formData.append('equipo', equipoTexto);
+            formData.append('problema', document.getElementById('tipo').value);
+            formData.append('descripcion', document.getElementById('descripcion').value);
+            formData.append('correoUsuario', currentUser ? currentUser.username + "@dominio.com" : "");
+            
+            // Si el usuario seleccionó una foto o archivo, lo agregamos
+            if (archivoInput.files.length > 0) {
+              formData.append('archivo', archivoInput.files[0]);
+            }
 
-      try {
+            // Petición nativa con fetch para enviar el formulario con archivos
+            const response = await fetch('/api/reportes', {
+              method: 'POST',
+              body: formData
+            });
 
-        await postApi('/api/reportes', {
-          activoId:
-            document.getElementById('activoId').value,
+            if (!response.ok) throw new Error('Error al enviar el reporte');
 
-          equipo:
-            document.getElementById('activoId')
-              .options[
-                document.getElementById('activoId').selectedIndex
-              ].text,
+            alert('Reporte enviado correctamente con evidencia ✅');
+            document.getElementById('formMantenimientos').reset();
+            loadMantenimientosData();
 
-          problema:
-            document.getElementById('tipo').value,
-
-          descripcion:
-            document.getElementById('descripcion').value
+          } catch (error) {
+            console.error(error);
+            alert('No se pudo enviar el reporte');
+          }
         });
-
-        alert('Reporte enviado correctamente ✅');
-
-        loadMantenimientosData();
-
-      } catch (error) {
-
-        console.error(error);
-
-        alert('No se pudo enviar el reporte');
-      }
-    });
-}
+    }
 
   } catch (error) {
-    setRequestError(
-      'No se pudo cargar los mantenimientos.'
-    );
+    setRequestError('No se pudo cargar los mantenimientos.');
   }
 }
-
 async function deleteUser(userId) {
 
   const confirmDelete = confirm(
