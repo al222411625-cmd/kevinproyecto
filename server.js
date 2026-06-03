@@ -642,87 +642,51 @@ app.get('/api/test-email', async (req, res) => {
     });
   }
 });
-
 app.post('/api/reportes',
   requireAuth,
   async (req, res) => {
-
     try {
-      if (
-  !req.body.equipo ||
-  !req.body.problema ||
-  !req.body.descripcion
-) {
-  return res.status(400).json({
-    error: 'Faltan datos del reporte'
-  });
-}
+      if (!req.body.equipo || !req.body.problema || !req.body.descripcion) {
+        return res.status(400).json({
+          error: 'Faltan datos del reporte'
+        });
+      }
+      const nuevoReporte = await Reporte.create({
+        activoId: req.body.activoId,
+        equipo: req.body.equipo,
+        problema: req.body.problema,
+        descripcion: req.body.descripcion,
+        usuario: req.session.user.nombre,
+        correoUsuario: req.body.correoUsuario || '',
+        fecha: new Date().toLocaleDateString(),
+        estado: 'Pendiente'
+      });
 
-     const nuevoReporte =
-  await Reporte.create({
-    activoId: req.body.activoId,
-    equipo: req.body.equipo,
-    problema: req.body.problema,
-    descripcion: req.body.descripcion,
-    usuario: req.session.user.nombre,
-    correoUsuario: req.body.correoUsuario,
-    fecha: new Date().toLocaleDateString(),
-    estado: 'Pendiente'
-  });
-
-
-        console.log("EMAIL_USER:", process.env.EMAIL_USER);
-console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "OK" : "FALTA");
-
-console.log("ENTRO AL REPORTE");
-await sendMail(
-  process.env.EMAIL_USER,
-  "🔴 Nuevo reporte de máquina - ITrack",
-  `
-  <div style="font-family: Arial; padding:20px;">
-    <h2>Nuevo reporte recibido</h2>
-
-    <p><b>Equipo:</b> ${req.body.equipo}</p>
-    <p><b>Problema:</b> ${req.body.problema}</p>
-    <p><b>Descripción:</b> ${req.body.descripcion}</p>
-    <p><b>Usuario:</b> ${req.session.user.nombre}</p>
-    <p><b>Fecha:</b> ${new Date().toLocaleString()}</p>
-
-    <hr>
-
-    <p>Revisa el reporte en ITrack.</p>
-  </div>
-  `
-);
-
-      res.status(201).json(nuevoReporte);
-
+      await Mantenimiento.create({
+        activoId: req.body.activoId,
+        fecha: new Date().toLocaleDateString(),
+        tipo: req.body.problema,
+        responsable: req.session.user.nombre,
+        descripcion: req.body.descripcion
+      });
+      return res.status(201).json(nuevoReporte);
     } catch (error) {
-
       console.error(error);
-
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Error creando reporte'
       });
     }
 });
 
 app.get('/api/reportes',
-
-  
   requireAuth,
   async (req, res) => {
-
     try {
-
-      const reportes =
-        await Reporte.find();
-
-      res.json(reportes);
-
+      const reportes = await Reporte.find();
+      return res.json(reportes || []);
     } catch (error) {
-
-      res.status(500).json({
+      console.error(error);
+      return res.status(500).json({
         error: 'Error cargando reportes'
       });
     }
@@ -732,12 +696,8 @@ app.put('/api/reportes/:id/solucionar',
   requireAuth,
   requireRole('admin', 'technician'),
   async (req, res) => {
-
     try {
-
-      const reporte =
-        await Reporte.findById(req.params.id);
-
+      const reporte = await Reporte.findById(req.params.id);
       if (!reporte) {
         return res.status(404).json({
           error: 'Reporte no encontrado'
@@ -745,54 +705,20 @@ app.put('/api/reportes/:id/solucionar',
       }
 
       reporte.estado = 'Solucionado';
-
       await reporte.save();
 
-      // Enviar correo al usuario
-      if (reporte.correoUsuario) {
-
-        await sendMail(
-          reporte.correoUsuario,
-          '✅ Tu reporte fue solucionado - ITrack',
-          `
-          <div style="font-family: Arial; padding:20px;">
-            <h2>Tu reporte ya fue solucionado</h2>
-
-            <p><b>Equipo:</b> ${reporte.equipo}</p>
-            <p><b>Problema:</b> ${reporte.problema}</p>
-
-            <p>
-              El equipo de soporte ya atendió tu incidencia.
-            </p>
-
-            <hr>
-
-            <p>Gracias por usar ITrack.</p>
-          </div>
-          `
-        );
-
-        console.log('Correo de solución enviado');
-      }
-
-      res.json({
+      return res.json({
         success: true,
         reporte
       });
-
     } catch (error) {
-
       console.error(error);
-
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Error solucionando reporte'
       });
     }
 });
 
-
 app.use((req, res) => {
   res.status(404).send('Recurso no encontrado');
 });
-
-
