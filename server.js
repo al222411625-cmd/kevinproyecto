@@ -11,13 +11,12 @@ const PORT = process.env.PORT || 3000;
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 
-// Configuración para almacenar los archivos en la carpeta de subidas
+// Configuración de almacenamiento para Multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'public/uploads/'); 
   },
   filename: function (req, file, cb) {
-    // Esto les cambia el nombre por la fecha actual para que no se dupliquen
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
@@ -25,19 +24,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Configuración de almacenamiento de archivos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'public/uploads/'); // Los archivos se guardarán en esta carpeta
-  },
-  filename: function (req, file, cb) {
-    // Esto renombra el archivo con la fecha actual para que no se dupliquen nombres
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage: storage });
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   port: 587,
@@ -50,6 +36,7 @@ const transporter = nodemailer.createTransport({
     rejectUnauthorized: false
   }
 });
+
 transporter.verify((error, success) => {
   if (error) {
     console.log('❌ Error Gmail:', error);
@@ -57,52 +44,37 @@ transporter.verify((error, success) => {
     console.log('✅ Gmail listo');
   }
 });
+
 mongoose.connect(process.env.MONGODB_URI)
 .then(async () => {
-
   console.log('✅ MongoDB conectado');
-
   await crearUsuariosIniciales();
-
   app.listen(PORT, () => {
     console.log(`✅ ITrack server escuchando en http://localhost:${PORT}`);
   });
-
 })
 .catch(err => {
-
   console.error('❌ Error conectando MongoDB');
-  console.error(err.message);
-
-});
-// MODELOS MONGODB
-
-const activoSchema = new mongoose.Schema({
-  categoria: String,
-  tipo: String,
-  marca: String,
-  serial: String,
-  estado: String,
-  area: String
+  console.error(err);
 });
 
 const usuarioSchema = new mongoose.Schema({
   nombre: String,
-  cargo: String,
-  area: String
+  usuario: { type: String, unique: true },
+  contrasena: String,
+  rol: { type: String, enum: ['admin', 'technician', 'user'], default: 'user' }
 });
 
-const areaSchema = new mongoose.Schema({
-  nombre: String
-});
+const Usuario = mongoose.model('Usuario', usuarioSchema);
 
-const mantenimientoSchema = new mongoose.Schema({
-  activoId: String,
-  fecha: String,
+const activoSchema = new mongoose.Schema({
+  nombre: String,
   tipo: String,
-  responsable: String,
-  descripcion: String
+  serial: String,
+  estado: String
 });
+
+const Activo = mongoose.model('Activo', activoSchema);
 
 const reporteSchema = new mongoose.Schema({
   activoId: String,
@@ -119,562 +91,141 @@ const reporteSchema = new mongoose.Schema({
   }
 });
 
-const authUserSchema = new mongoose.Schema({
-  username: String,
-  nombre: String,
-  role: String,
-  passwordHash: String
+const Reporte = mongoose.model('Reporte', reporteSchema);
+
+const mantenimientoSchema = new mongoose.Schema({
+  activoId: String,
+  fecha: String,
+  tipo: String,
+  responsable: String,
+  descripcion: String
 });
 
-const Activo = mongoose.model('Activo', activoSchema);
-const Usuario = mongoose.model('Usuario', usuarioSchema);
-const Area = mongoose.model('Area', areaSchema);
 const Mantenimiento = mongoose.model('Mantenimiento', mantenimientoSchema);
-const Reporte = mongoose.model('Reporte', reporteSchema);
-const AuthUser = mongoose.model('AuthUser', authUserSchema);
-
-app.use(express.json());
-app.use(session({
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 1000 * 60 * 60 * 2
-  }
-}));
-app.use(express.static(path.join(__dirname, 'public')));
-
-
 
 async function crearUsuariosIniciales() {
-  const total = await AuthUser.countDocuments();
+  try {
+    const count = await Usuario.countDocuments();
+    if (count === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashAdmin = await bcrypt.hash('admin123', salt);
+      const hashTec = await bcrypt.hash('tec123', salt);
+      const hashUser = await bcrypt.hash('user123', salt);
 
-  if (total === 0) {
-    await AuthUser.insertMany([
-      {
-        username: 'admin',
-        nombre: 'Administrador',
-        role: 'admin',
-        passwordHash: bcrypt.hashSync('Admin1234', 10)
-      },
-      {
-        username: 'tecnico',
-        nombre: 'Técnico ITrack',
-        role: 'technician',
-        passwordHash: bcrypt.hashSync('Tech1234', 10)
-      },
-      {
-        username: 'usuario',
-        nombre: 'Usuario ITrack',
-        role: 'user',
-        passwordHash: bcrypt.hashSync('User1234', 10)
-      }
-    ]);
-
-    console.log('Usuarios iniciales creados');
+      await Usuario.create([
+        { nombre: 'Administrador Principal', usuario: 'admin', contrasena: hashAdmin, rol: 'admin' },
+        { nombre: 'Técnico de Soporte', usuario: 'tecnico', contrasena: hashTec, rol: 'technician' },
+        { nombre: 'Usuario Empleado', usuario: 'usuario', contrasena: hashUser, rol: 'user' }
+      ]);
+      console.log('✅ Usuarios iniciales creados (admin, tecnico, usuario)');
+    }
+  } catch (err) {
+    console.error('❌ Error creando usuarios iniciales:', err);
   }
 }
 
-//crearUsuariosIniciales();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use(session({
+  secret: 'clave_secreta_itrack_2024_xyz',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+}));
+
 function requireAuth(req, res, next) {
   if (req.session && req.session.user) {
     return next();
   }
-  return res.status(401).json({ error: 'No autorizado' });
+  return res.status(401).json({ error: 'No autenticado' });
 }
 
 function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.session || !req.session.user) {
-      return res.status(401).json({ error: 'No autorizado' });
+    if (req.session && req.session.user && roles.includes(req.session.user.rol)) {
+      return next();
     }
-    if (!roles.includes(req.session.user.role)) {
-      return res.status(403).json({ error: 'Acceso denegado' });
-    }
-    next();
+    return res.status(403).json({ error: 'No autorizado para este rol' });
   };
 }
 
-app.post('/api/register', async (req, res) => {
-  try {
-    const { username, password, nombre } = req.body;
-
-    if (!username || !password || !nombre) {
-      return res.status(400).json({
-        error: 'Todos los campos son obligatorios'
-      });
-    }
-
-    const usuarioExistente = await AuthUser.findOne({
-      username: username.toLowerCase()
-    });
-
-    if (usuarioExistente) {
-      return res.status(409).json({
-        error: 'El nombre de usuario ya existe'
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const nuevoUsuario = new AuthUser({
-      username: username.toLowerCase(),
-      nombre,
-      role: 'user',
-      passwordHash
-    });
-
-    await nuevoUsuario.save();
-
-    console.log('Usuario registrado:', nuevoUsuario);
-
-    req.session.user = {
-      id: nuevoUsuario._id,
-      username: nuevoUsuario.username,
-      nombre: nuevoUsuario.nombre,
-      role: nuevoUsuario.role
-    };
-
-    res.status(201).json({
-      user: req.session.user
-    });
-
-  } catch (error) {
-    console.error('ERROR REGISTER:', error);
-
-    res.status(500).json({
-      error: 'No se pudo registrar'
-    });
-  }
-});
-
 app.post('/api/login', async (req, res) => {
+  const { usuario, contrasena } = req.body;
+  if (!usuario || !contrasena) {
+    return res.status(400).json({ error: 'Faltan credenciales' });
+  }
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-  return res.status(400).json({
-    error: 'Faltan datos'
-  });
-}
-
-    const user = await AuthUser.findOne({
-      username: username.toLowerCase()
-    });
-
+    const user = await Usuario.findOne({ usuario });
     if (!user) {
-      return res.status(401).json({
-        error: 'Credenciales inválidas'
-      });
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
-
-    const passwordValid = await bcrypt.compare(
-      password,
-      user.passwordHash
-    );
-
-    if (!passwordValid) {
-      return res.status(401).json({
-        error: 'Credenciales inválidas'
-      });
+    const match = await bcrypt.compare(contrasena, user.contrasena);
+    if (!match) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
-
     req.session.user = {
       id: user._id,
-      username: user.username,
       nombre: user.nombre,
-      role: user.role
+      usuario: user.usuario,
+      rol: user.rol
     };
-
-    res.json({
-      user: req.session.user
-    });
-
+    return res.json({ success: true, user: req.session.user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      error: 'Error al iniciar sesión'
-    });
+    return res.status(500).json({ error: 'Error en el servidor' });
   }
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.json({ ok: true });
+  req.session.destroy(err => {
+    if (err) return res.status(500).json({ error: 'No se pudo cerrar sesión' });
+    res.clearCookie('connect.sid');
+    return res.json({ success: true });
   });
 });
 
-app.get('/api/auth-status', (req, res) => {
-  res.json({ authenticated: Boolean(req.session && req.session.user), user: req.session?.user || null });
+app.get('/api/me', (req, res) => {
+  if (req.session && req.session.user) {
+    return res.json({ user: req.session.user });
+  }
+  return res.status(401).json({ error: 'No autenticado' });
 });
 
-
-app.get('/api/usuarios', requireAuth, async (req, res) => {
+app.get('/api/activos', requireAuth, async (req, res) => {
   try {
-    const usuarios = await Usuario.find();
-    res.json(usuarios);
+    const activos = await Activo.find();
+    return res.json(activos);
   } catch (error) {
-    res.status(500).json({
-      error: 'Error cargando usuarios'
-    });
+    console.error(error);
+    return res.status(500).json({ error: 'Error cargando activos' });
   }
 });
 
-app.get('/api/areas', requireAuth, async (req, res) => {
+app.post('/api/activos', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const areas = await Area.find();
-    res.json(areas);
+    const nuevoActivo = await Activo.create(req.body);
+    return res.status(201).json(nuevoActivo);
   } catch (error) {
-    res.status(500).json({
-      error: 'Error cargando áreas'
-    });
+    console.error(error);
+    return res.status(500).json({ error: 'Error creando activo' });
   }
 });
 
 app.get('/api/mantenimientos', requireAuth, async (req, res) => {
   try {
     const mantenimientos = await Mantenimiento.find();
-    res.json(mantenimientos);
-  } catch (error) {
-    res.status(500).json({
-      error: 'Error cargando mantenimientos'
-    });
-  }
-});
-
-app.get('/api/admin/users',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-    try {
-      const users = await AuthUser.find().select('-passwordHash');
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ error: 'Error cargando usuarios admin' });
-    }
-  }
-);
-
-app.delete('/api/admin/users/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-
-    try {
-      const { id } = req.params;
-
-      // Evitar borrar al admin principal
-      const user = await AuthUser.findById(id);
-
-      if (!user) {
-        return res.status(404).json({
-          error: 'Usuario no encontrado'
-        });
-      }
-
-      if (user.username === 'admin') {
-        return res.status(403).json({
-          error: 'No puedes eliminar el admin principal'
-        });
-      }
-
-      await AuthUser.findByIdAndDelete(id);
-
-      res.json({
-        success: true,
-        message: 'Usuario eliminado'
-      });
-
-    } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
-        error: 'No se pudo eliminar el usuario'
-      });
-    }
-});
-
-// ACTIVOS
-
-app.get('/api/activos', requireAuth, async (req, res) => {
-  try {
-    const tipo = req.query.tipo;
-
-    let activos;
-
-    if (tipo) {
-      activos = await Activo.find({
-        categoria: new RegExp(tipo, 'i')
-      });
-    } else {
-      activos = await Activo.find();
-    }
-
-    res.json(activos);
-
+    return res.json(mantenimientos || []);
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      error: 'Error obteniendo activos'
-    });
-  }
-});
-app.post('/api/activos',
-  requireAuth,
-  requireRole('admin', 'technician'),
-  async (req, res) => {
-
-    try {
-
-      const nuevoActivo =
-        await Activo.create(req.body);
-
-      res.status(201).json(nuevoActivo);
-
-    } catch (error) {
-
-      console.error(error);
-
-      res.status(500).json({
-        error: 'Error creando activo'
-      });
-    }
-});
-
-app.put('/api/activos/:id',
-  requireAuth,
-  requireRole('admin', 'technician'),
-  async (req, res) => {
-    try {
-
-      const actualizado =
-        await Activo.findByIdAndUpdate(
-          req.params.id,
-          req.body,
-          { new: true }
-        );
-
-      if (!actualizado) {
-        return res.status(404).json({
-          error: 'Activo no encontrado'
-        });
-      }
-
-      res.json(actualizado);
-
-    } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
-        error: 'Error actualizando activo'
-      });
-    }
-});
-
-app.delete('/api/activos/:id', requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    const eliminado = await Activo.findByIdAndDelete(req.params.id);
-
-    if (!eliminado) {
-      return res.status(404).json({ error: 'Activo no encontrado' });
-    }
-
-    res.json(eliminado);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error cargando mantenimientos' });
   }
 });
 
-app.get('/api/dashboard', requireAuth, async (req, res) => {
-  try {
-    const totalActivos = await Activo.countDocuments();
-    const totalComputadoras = await Activo.countDocuments({
-      categoria: 'Computadora'
-    });
-
-    const totalImpresoras = await Activo.countDocuments({
-      categoria: 'Impresora'
-    });
-
-    const totalSwitches = await Activo.countDocuments({
-      categoria: 'Switch'
-    });
-
-  const totalUsuarios =
-  await AuthUser.countDocuments();
-    const totalAreas = await Area.countDocuments();
-    const totalMantenimientos = await Mantenimiento.countDocuments();
-
-    const activosMantenimiento = await Activo.countDocuments({
-      estado: /mantenimiento/i
-    });
-
-    res.json({
-      totalActivos,
-      totalComputadoras,
-      totalImpresoras,
-      totalSwitches,
-      totalMantenimientos,
-      totalUsuarios,
-      totalAreas,
-      activosMantenimiento
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: 'Error al cargar dashboard'
-    });
-  }
-});
-
-
-
-app.post('/api/usuarios', requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    const nuevoUsuario = await Usuario.create(req.body);
-    res.status(201).json(nuevoUsuario);
-  } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
-  }
-});
-
-app.post('/api/areas', requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    const nuevaArea = await Area.create(req.body);
-    res.status(201).json(nuevaArea);
-  } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
-  }
-});
-
-app.post('/api/mantenimientos',
-  requireAuth,
-  requireRole('admin', 'technician', 'user'),
-  async (req, res) => {
-
-    try {
-      const nuevoMantenimiento =
-        await Mantenimiento.create(req.body);
-
-      res.status(201).json(nuevoMantenimiento);
-
-    } catch (error) {
-      res.status(500).json({
-        error: error.message
-      });
-    }
-});
-
-
-app.delete('/api/usuarios/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-
-    try {
-
-      const eliminado =
-        await Usuario.findByIdAndDelete(req.params.id);
-
-      if (!eliminado) {
-        return res.status(404).json({
-          error: 'Usuario no encontrado'
-        });
-      }
-
-      res.json(eliminado);
-
-    } catch (error) {
-
-      res.status(500).json({
-        error: error.message
-      });
-    }
-});
-
-app.delete('/api/areas/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-
-    try {
-
-      const eliminada =
-        await Area.findByIdAndDelete(req.params.id);
-
-      if (!eliminada) {
-        return res.status(404).json({
-          error: 'Área no encontrada'
-        });
-      }
-
-      res.json(eliminada);
-
-    } catch (error) {
-
-      res.status(500).json({
-        error: error.message
-      });
-    }
-});
-
-app.delete('/api/mantenimientos/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-
-    try {
-
-      const eliminado =
-        await Mantenimiento.findByIdAndDelete(
-          req.params.id
-        );
-
-      if (!eliminado) {
-        return res.status(404).json({
-          error: 'Mantenimiento no encontrado'
-        });
-      }
-
-      res.json(eliminado);
-
-    } catch (error) {
-
-      res.status(500).json({
-        error: error.message
-      });
-    }
-});
-
-app.get('/api/test-email', async (req, res) => {
-  try {
-
-    await sendMail(
-      process.env.EMAIL_USER,
-      'Prueba de correo ITrack',
-      '<h1>Si ves esto, el correo funciona ✅</h1>'
-    );
-
-    res.json({
-      message: 'Correo enviado'
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      error: 'Error enviando correo'
-    });
-  }
-});
 app.post('/api/reportes',
   requireAuth,
-  upload.single('archivo'), // <-- Intercepta la foto del formulario
+  upload.single('archivo'),
   async (req, res) => {
     try {
       if (!req.body.equipo || !req.body.problema || !req.body.descripcion) {
@@ -683,7 +234,6 @@ app.post('/api/reportes',
         });
       }
 
-      // Si subieron foto guardamos su ruta, si no, se queda vacía
       const rutaArchivo = req.file ? `/uploads/${req.file.filename}` : '';
 
       const nuevoReporte = await Reporte.create({
@@ -694,7 +244,7 @@ app.post('/api/reportes',
         usuario: req.session.user.nombre,
         correoUsuario: req.body.correoUsuario || '',
         fecha: new Date().toLocaleDateString(),
-        archivo: rutaArchivo, // <-- Se guarda en MongoDB Atlas
+        archivo: rutaArchivo,
         estado: 'Pendiente'
       });
 
