@@ -50,114 +50,42 @@ function renderAuthScreen(message = '') {
   dashboardCards.style.display = 'none';
   contentArea.innerHTML = `
 <div class="row gy-4 justify-content-center">
-
-  <!-- LOGIN -->
 <div class="col-lg-5">
     <div class="card border-0 shadow-sm p-4">
       <h3 class="card-title">Iniciar sesión</h3>
-
-      <p class="text-muted">
-        Ingresa con tu usuario y contraseña para gestionar el inventario.
-      </p>
-
+      <p class="text-muted">Ingresa con tu usuario y contraseña para gestionar el inventario.</p>
       ${message ? renderAlert('warning', message) : ''}
-
       <form id="loginForm">
         <div class="mb-3">
-          <label class="form-label">
-            Usuario
-          </label>
-
-          <input
-            class="form-control"
-            id="loginUsername"
-            name="username"
-            type="text"
-            required
-          />
+          <label class="form-label">Usuario</label>
+          <input class="form-control" id="loginUsername" name="username" type="text" required />
         </div>
-
         <div class="mb-3">
-          <label class="form-label">
-            Contraseña
-          </label>
-
-          <input
-            class="form-control"
-            id="loginPassword"
-            name="password"
-            type="password"
-            required
-          />
+          <label class="form-label">Contraseña</label>
+          <input class="form-control" id="loginPassword" name="password" type="password" required />
         </div>
-
-        <button type="submit"
-          class="btn btn-primary">
-          Entrar
-        </button>
+        <button type="submit" class="btn btn-primary">Entrar</button>
       </form>
     </div>
   </div>
 <div class="col-lg-5">
     <div class="card border-0 shadow-sm p-4 h-100">
-      <h3 class="card-title">
-        Registrar cuenta
-      </h3>
-
-      <p class="text-muted">
-        Crea un usuario nuevo para acceder al sistema de ITrack.
-      </p>
-
+      <h3 class="card-title">Registrar cuenta</h3>
+      <p class="text-muted">Crea un usuario nuevo para acceder al sistema de ITrack.</p>
       <form id="registerForm">
-
         <div class="mb-3">
-          <label class="form-label">
-            Nombre completo
-          </label>
-
-          <input
-            class="form-control"
-            id="registerName"
-            name="nombre"
-            type="text"
-            required
-          />
+          <label class="form-label">Nombre completo</label>
+          <input class="form-control" id="registerName" name="nombre" type="text" required />
         </div>
-
         <div class="mb-3">
-          <label class="form-label">
-            Usuario
-          </label>
-
-          <input
-            class="form-control"
-            id="registerUsername"
-            name="username"
-            type="text"
-            required
-          />
+          <label class="form-label">Usuario</label>
+          <input class="form-control" id="registerUsername" name="username" type="text" required />
         </div>
-
         <div class="mb-3">
-          <label class="form-label">
-            Contraseña
-          </label>
-
-          <input
-            class="form-control"
-            id="registerPassword"
-            name="password"
-            type="password"
-            required
-          />
+          <label class="form-label">Contraseña</label>
+          <input class="form-control" id="registerPassword" name="password" type="password" required />
         </div>
-
-        <button
-          type="submit"
-          class="btn btn-outline-primary">
-          Registrar
-        </button>
-
+        <button type="submit" class="btn btn-outline-primary">Registrar</button>
       </form>
     </div>
   </div>
@@ -184,13 +112,15 @@ function renderAuthScreen(message = '') {
     event.preventDefault();
     try {
       const formData = new FormData(event.target);
-      const payload = {
-        nombre: formData.get('nombre'),
-        username: formData.get('username'),
-        password: formData.get('password'),
-        role: formData.get('role')
-      };
-      const result = await postApi('/api/register', payload);
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+      }
+      const result = await response.json();
       currentUser = result.user;
       renderApp();
     } catch (error) {
@@ -210,11 +140,7 @@ function renderApp() {
 }
 
 function getRoleLabel(role) {
-  const labels = {
-    admin: 'Admin',
-    technician: 'Técnico',
-    user: 'Usuario'
-  };
+  const labels = { admin: 'Admin', technician: 'Técnico', user: 'Usuario' };
   return labels[role] || role;
 }
 
@@ -228,11 +154,7 @@ function isRole(...roles) {
 }
 
 async function logout() {
-  try {
-    await postApi('/api/logout', {});
-  } catch (error) {
-    // ignore logout errors
-  }
+  try { await postApi('/api/logout', {}); } catch (error) {}
   currentUser = null;
   renderAuthScreen();
 }
@@ -311,19 +233,10 @@ async function loadAdminPanel() {
     <td>${user.nombre}</td>
     <td>${getRoleLabel(user.role)}</td>
     <td>${user.username}</td>
-
     <td>
       ${user.username !== 'admin' ? `
-        <button
-          class="btn btn-danger btn-sm"
-          onclick="deleteUser('${user._id}')">
-          Eliminar
-        </button>
-      ` : `
-        <span class="text-success">
-          Protegido
-        </span>
-      `}
+        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">Eliminar</button>
+      ` : `<span class="text-success">Protegido</span>`}
     </td>
   </tr>
 `).join('');
@@ -355,28 +268,20 @@ function setRequestError(message) {
 async function loadDashboardData() {
   try {
     const data = await fetchApi('/api/dashboard');
-  dashboardCards.innerHTML = `
+    dashboardCards.innerHTML = `
   <div class="dashboard-item rounded-4 p-3 text-center">
     <h6 class="text-info">Equipos Totales</h6>
     <h2 class="text-white">${data.totalActivos}</h2>
   </div>
-
   <div class="dashboard-item rounded-4 p-3 text-center">
     <h6 class="text-info">Estado del sistema</h6>
     <p class="text-success mb-1">🟢 En línea</p>
-    <small class="text-muted">
-      Todo funcionando correctamente
-    </small>
+    <small class="text-muted">Todo funcionando correctamente</small>
   </div>
-
   <div class="dashboard-item rounded-4 p-3 text-center">
     <h6 class="text-info">Actividad</h6>
-    <small class="text-muted">
-      ${data.totalMantenimientos}
-      mantenimientos registrados
-    </small>
+    <small class="text-muted">${data.totalMantenimientos} mantenimientos registrados</small>
   </div>
-
   <div class="dashboard-item rounded-4 p-3 text-center">
     <h6 class="text-info">Usuarios</h6>
     <h3 class="text-white">${data.totalUsuarios}</h3>
@@ -385,122 +290,40 @@ async function loadDashboardData() {
 
     contentArea.innerHTML = `
   <h3 class="card-title">Dashboard</h3>
-  <p class="text-muted">
-    Visión de inventario con estadísticas del sistema.
-  </p>
-
+  <p class="text-muted">Visión de inventario con estadísticas del sistema.</p>
   <div class="card border-0 shadow-sm p-4 h-100">
     <h5 class="mb-4">Estadísticas del inventario</h5>
-
     <canvas id="inventoryChart" height="120"></canvas>
   </div>
 `;
-const ctx = document
-  .getElementById('inventoryChart')
-  .getContext('2d');
-
-new Chart(ctx, {
-  type: 'bar',
-
-  data: {
-    labels: [
-      'Computadoras',
-      'Impresoras',
-      'Switches',
-      'Usuarios',
-      'Mantenimientos'
-    ],
-
-    datasets: [{
-      label: 'Cantidad',
-
-      data: [
-        data.totalComputadoras,
-        data.totalImpresoras,
-        data.totalSwitches,
-        data.totalUsuarios,
-        data.totalMantenimientos
-      ],
-
-      backgroundColor: [
-        'rgba(0,255,255,0.7)',
-        'rgba(13,110,253,0.7)',
-        'rgba(170,0,255,0.7)',
-        'rgba(0,255,140,0.7)',
-        'rgba(255,0,255,0.7)'
-      ],
-
-      borderColor: [
-        '#00ffff',
-        '#0d6efd',
-        '#aa00ff',
-        '#00ff8c',
-        '#ff00ff'
-      ],
-
-      borderWidth: 2,
-      borderRadius: 12,
-      hoverBorderWidth: 4
-    }]
-  },
-
-  options: {
-    responsive: true,
-
-    plugins: {
-      legend: {
-        labels: {
-          color: '#d9f8ff',
-          font: {
-            size: 14
-          }
-        }
-      }
-    },
-
-    scales: {
-      x: {
-        ticks: {
-          color: '#9be7ff'
-        },
-
-        grid: {
-          color: 'rgba(0,255,255,.08)'
-        }
+    const ctx = document.getElementById('inventoryChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Computadoras', 'Impresoras', 'Switches', 'Usuarios', 'Mantenimientos'],
+        datasets: [{
+          label: 'Cantidad',
+          data: [data.totalComputadoras, data.totalImpresoras, data.totalSwitches, data.totalUsuarios, data.totalMantenimientos],
+          backgroundColor: ['rgba(0,255,255,0.7)', 'rgba(13,110,253,0.7)', 'rgba(170,0,255,0.7)', 'rgba(0,255,140,0.7)', 'rgba(255,0,255,0.7)'],
+          borderColor: ['#00ffff', '#0d6efd', '#aa00ff', '#00ff8c', '#ff00ff'],
+          borderWidth: 2,
+          borderRadius: 12,
+          hoverBorderWidth: 4
+        }]
       },
-
-      y: {
-        beginAtZero: true,
-
-        ticks: {
-          color: '#9be7ff'
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#d9f8ff', font: { size: 14 } } } },
+        scales: {
+          x: { ticks: { color: '#9be7ff' }, grid: { color: 'rgba(0,255,255,.08)' } },
+          y: { beginAtZero: true, ticks: { color: '#9be7ff' }, grid: { color: 'rgba(0,255,255,.08)' } }
         },
-
-        grid: {
-          color: 'rgba(0,255,255,.08)'
-        }
+        animation: { duration: 2000 }
       }
-    },
-        animation: {
-      duration: 2000
-    }
-  }
-});
+    });
   } catch (error) {
-    setRequestError(
-      'No se pudo cargar el dashboard. Intenta recargar la página.'
-    );
+    setRequestError('No se pudo cargar el dashboard. Intenta recargar la página.');
   }
-}
-
-
-function setDashboardCard(title, value) {
-  return `
-    <div class="dashboard-item rounded-4 p-3">
-      <p class="mb-1 text-white-75">${title}</p>
-      <h3 class="mb-0 text-white">${value}</h3>
-    </div>
-  `;
 }
 
 async function deleteRecord(endpoint, id, callback) {
@@ -525,24 +348,17 @@ async function loadActivos() {
       <tr>
         <td>${activo._id}</td>
         <td>${activo.categoria}</td>
-        <td>${activo.tipo}</td>
+        <td>${activo.tipo || activo.type || 'N/A'}</td>
         <td>${activo.marca}</td>
         <td>${activo.serial}</td>
         <td>${activo.estado}</td>
         <td>${activo.area}</td>
-        ${canDelete ? `<td><button class="btn btn-sm btn-danger" onclick="deleteRecord('/api/activos', '${activo._id}', loadActivos)"">Eliminar</button></td>` : ''}
+        ${canDelete ? `<td><button class="btn btn-sm btn-danger" onclick="deleteRecord('/api/activos', '${activo._id}', loadActivos)">Eliminar</button></td>` : ''}
       </tr>
-      
     `).join('');
 
-    
     contentArea.innerHTML = `
-      ${createTable(
-        'Inventario de equipos',
-        'Registros de computadoras, impresoras y switches con sus números de serie y ubicación.',
-        headers,
-        rows
-      )}
+      ${createTable('Inventario de equipos', 'Registros de computadoras, impresoras y switches con sus números de serie y ubicación.', headers, rows)}
       ${canAdd ? renderForm('Registrar nuevo activo', [
         { id: 'categoria', label: 'Categoría', type: 'text', placeholder: 'Computadora / Impresora / Switch', required: true },
         { id: 'tipo', label: 'Tipo', type: 'text', placeholder: 'Laptop, Impresora láser, Switch 24 puertos', required: true },
@@ -552,36 +368,25 @@ async function loadActivos() {
         { id: 'area', label: 'Área', type: 'text', placeholder: 'Finanzas, Redes', required: true }
       ], 'formActivos', 'Registrar activo') : ''}
     `;
-if (canAdd) {
-  document
-        .getElementById('formMantenimientos')
-        .addEventListener('submit', async event => {
-          event.preventDefault();
 
-          try {
-            const activoSelect = document.getElementById('activoId');
-            const equipoTexto = activoSelect.options[activoSelect.selectedIndex].text;
-
-            await postApi('/api/reportes', {
-              activoId: activoSelect.value,
-              equipo: equipoTexto,
-              problema: document.getElementById('tipo').value,
-              descripcion: document.getElementById('descripcion').value,
-              correoUsuario: currentUser ? currentUser.username + "@dominio.com" : ""
-            });
-
-            alert('Reporte enviado correctamente ✅');
-            
-            document.getElementById('formMantenimientos').reset();
-            loadMantenimientosData();
-
-          } catch (error) {
-            console.error(error);
-            alert('No se pudo enviar el reporte');
-          }
-        });
-}
-    
+    if (canAdd) {
+      document.getElementById('formActivos').addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          const formData = new FormData(event.target);
+          const response = await fetch('/api/activos', {
+            method: 'POST',
+            body: formData
+          });
+          if (!response.ok) throw new Error('Error al registrar activo');
+          alert('Activo registrado correctamente ✅');
+          loadActivos();
+        } catch (error) {
+          console.error(error);
+          alert('No se pudo guardar el activo.');
+        }
+      });
+    }
   } catch (error) {
     setRequestError('No se pudo cargar los activos. Intenta nuevamente.');
   }
@@ -605,12 +410,7 @@ async function loadUsuariosData() {
     `).join('');
 
     contentArea.innerHTML = `
-      ${createTable(
-        'Usuarios registrados',
-        'Lista de usuarios asignados a equipos y áreas del inventario.',
-        headers,
-        rows
-      )}
+      ${createTable('Usuarios registrados', 'Lista de usuarios asignados a equipos y áreas del inventario.', headers, rows)}
       ${canAdmin ? renderForm('Registrar nuevo usuario', [
         { id: 'nombre', label: 'Nombre completo', type: 'text', placeholder: 'Ana Pérez', required: true },
         { id: 'cargo', label: 'Cargo', type: 'text', placeholder: 'Analista, Técnico', required: true },
@@ -652,12 +452,7 @@ async function loadAreasData() {
     `).join('');
 
     contentArea.innerHTML = `
-      ${createTable(
-        'Áreas registradas',
-        'Departamentos y áreas donde se encuentran los equipos inventariados.',
-        headers,
-        rows
-      )}
+      ${createTable('Áreas registradas', 'Departamentos y áreas donde se encuentran los equipos inventariados.', headers, rows)}
       ${canAdmin ? renderForm('Registrar nueva área', [
         { id: 'nombre', label: 'Nombre del área', type: 'text', placeholder: 'Finanzas, Redes', required: true }
       ], 'formAreas', 'Registrar área') : ''}
@@ -682,14 +477,12 @@ async function loadMantenimientosData() {
   try {
     const mantenimientos = await fetchApi('/api/mantenimientos');
     const activos = await fetchApi('/api/activos');
-
     const canAdd = currentUser && (currentUser.role === 'admin' || currentUser.role === 'technician' || currentUser.role === 'user');
 
     contentArea.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Mantenimientos Programados</h2>
       </div>
-
       <div class="table-responsive bg-surface p-3 rounded-4 shadow-sm mb-4">
         <table class="table table-hover align-middle mb-0">
           <thead>
@@ -703,9 +496,7 @@ async function loadMantenimientosData() {
           </thead>
           <tbody>
             ${mantenimientos.map(m => {
-              // Corrección de coincidencia: Compara convirtiendo ambos valores a String
               const activo = activos.find(a => String(a._id) === String(m.activoId));
-              
               return `
                 <tr>
                   <td>
@@ -723,7 +514,6 @@ async function loadMantenimientosData() {
           </tbody>
         </table>
       </div>
-
       ${canAdd ? `
       <div class="card p-4 border-0 shadow-sm rounded-4">
         <h4 class="mb-3">Reportar Falla / Programar Mantenimiento</h4>
@@ -735,7 +525,6 @@ async function loadMantenimientosData() {
               ${activos.map(a => `<option value="${a._id}">${a.categoria} - ${a.marca} (${a.serial})</option>`).join('')}
             </select>
           </div>
-
           <div class="row">
             <div class="col-md-6 mb-3">
               <label for="tipo" class="form-label">Tipo de Problema</label>
@@ -746,104 +535,78 @@ async function loadMantenimientosData() {
               <textarea class="form-control" id="descripcion" rows="1" placeholder="Describe lo que sucede..." required></textarea>
             </div>
           </div>
-
-          <button type="submit" class="btn btn-primary rounded-pill px-4">
-            Enviar reporte
-          </button>
+          <div class="mb-3">
+            <label for="archivoInput" class="form-label">Adjuntar Evidencia / Foto (Opcional)</label>
+            <input type="file" class="form-control" id="archivoInput" accept="image/*,application/pdf">
+          </div>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Enviar reporte</button>
         </form>
       </div>
-      <div class="mb-3">
-  <label for="archivoInput" class="form-label">Adjuntar Evidencia / Foto (Opcional)</label>
-  <input type="file" class="form-data form-control" id="archivoInput" accept="image/*,application/pdf">
-</div>
       ` : ''}
     `;
+
     if (canAdd) {
-      document
-        .getElementById('formMantenimientos')
-        .addEventListener('submit', async event => {
-          event.preventDefault();
+      document.getElementById('formMantenimientos').addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          const activoSelect = document.getElementById('activoId');
+          const equipoTexto = activoSelect.options[activoSelect.selectedIndex].text;
+          const archivoInput = document.getElementById('archivoInput');
 
-          try {
-            const activoSelect = document.getElementById('activoId');
-            const equipoTexto = activoSelect.options[activoSelect.selectedIndex].text;
-            const archivoInput = document.getElementById('archivoInput');
-
-            // Usamos FormData para empaquetar texto e imágenes juntos
-            const formData = new FormData();
-            formData.append('activoId', activoSelect.value);
-            formData.append('equipo', equipoTexto);
-            formData.append('problema', document.getElementById('tipo').value);
-            formData.append('descripcion', document.getElementById('descripcion').value);
-            formData.append('correoUsuario', currentUser ? currentUser.username + "@dominio.com" : "");
-            
-            // Si el usuario seleccionó una foto o archivo, lo agregamos
-            if (archivoInput.files.length > 0) {
-              formData.append('archivo', archivoInput.files[0]);
-            }
-
-            // Petición nativa con fetch para enviar el formulario con archivos
-            const response = await fetch('/api/reportes', {
-              method: 'POST',
-              body: formData
-            });
-
-            if (!response.ok) throw new Error('Error al enviar el reporte');
-
-            alert('Reporte enviado correctamente con evidencia ✅');
-            document.getElementById('formMantenimientos').reset();
-            loadMantenimientosData();
-
-          } catch (error) {
-            console.error(error);
-            alert('No se pudo enviar el reporte');
+          const formData = new FormData();
+          formData.append('activoId', activoSelect.value);
+          formData.append('equipo', equipoTexto);
+          formData.append('problema', document.getElementById('tipo').value);
+          formData.append('descripcion', document.getElementById('descripcion').value);
+          formData.append('correoUsuario', currentUser ? currentUser.username + "@dominio.com" : "");
+          
+          if (archivoInput && archivoInput.files.length > 0) {
+            formData.append('archivo', archivoInput.files[0]);
           }
-        });
-    }
 
+          const response = await fetch('/api/reportes', {
+            method: 'POST',
+            body: formData
+          });
+          if (!response.ok) throw new Error('Error al enviar el reporte');
+          alert('Reporte enviado correctamente con evidencia ✅');
+          document.getElementById('formMantenimientos').reset();
+          loadMantenimientosData();
+        } catch (error) {
+          console.error(error);
+          alert('No se pudo enviar el reporte');
+        }
+      });
+    }
   } catch (error) {
     setRequestError('No se pudo cargar los mantenimientos.');
   }
 }
+
 async function deleteUser(userId) {
-
-  const confirmDelete = confirm(
-    '¿Seguro que quieres eliminar este usuario del sistema?'
-  );
-
+  const confirmDelete = confirm('¿Seguro que quieres eliminar este usuario del sistema?');
   if (!confirmDelete) return;
-
   try {
-
-    await fetchApi(`/api/admin/users/${userId}`, {
-      method: 'DELETE'
-    });
-
+    await fetchApi(`/api/admin/users/${userId}`, { method: 'DELETE' });
     alert('Usuario eliminado correctamente');
-
     loadAdminPanel();
-
   } catch (error) {
-
     alert('No se pudo eliminar el usuario');
   }
 }
+
 document.addEventListener('click', async (e) => {
     if (e.target && (e.target.id === 'btnExportarPDF' || e.target.closest('#btnExportarPDF'))) {
         e.preventDefault();
-        
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         let activos = [];
-        
         try {
             const response = await fetch('/api/activos', { method: 'GET' });
-            
             if (response.status === 401 || response.status === 403) {
                 alert("Sesión expirada o no autorizada. Por favor, vuelve a iniciar sesión.");
                 return;
             }
-            
             if (!response.ok) throw new Error('Error en la respuesta del servidor');
             activos = await response.json();
         } catch (error) {
@@ -859,7 +622,6 @@ document.addEventListener('click', async (e) => {
 
         doc.setFillColor(30, 58, 138); 
         doc.rect(0, 0, 210, 40, 'F');  
-
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(22);
@@ -896,30 +658,18 @@ document.addEventListener('click', async (e) => {
             head: [['#', 'Categoría', 'Tipo', 'Marca', 'N. Serie', 'Área', 'Estado']],
             body: tablaFilas,
             theme: 'striped',
-            headStyles: {
-                fillColor: [30, 58, 138], 
-                textColor: [255, 255, 255],
-                fontStyle: 'bold'
-            },
-            styles: {
-                font: "helvetica",
-                fontSize: 10,
-                cellPadding: 3
-            },
-            alternateRowStyles: {
-                fillColor: [245, 247, 250] 
-            }
+            headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold' },
+            styles: { font: "helvetica", fontSize: 10, cellPadding: 3 },
+            alternateRowStyles: { fillColor: [245, 247, 250] }
         });
 
         const finalY = doc.lastAutoTable.finalY + 20;
         doc.setDrawColor(200, 200, 200);
         doc.line(14, finalY, 196, finalY); 
-
         doc.setFontSize(9);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(100, 100, 100);
         doc.text("Reporte automatizado y certificado por el sistema de control interno ITrack. Confidencialidad de Sistemas Nivel 1.", 14, finalY + 8);
-
         doc.save(`Reporte_Infraestructura_TI_${fechaHoy.replace(/\//g, '-')}.pdf`);
     }
 });
