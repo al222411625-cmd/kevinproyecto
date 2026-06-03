@@ -828,3 +828,98 @@ async function deleteUser(userId) {
     alert('No se pudo eliminar el usuario');
   }
 }
+document.addEventListener('click', async (e) => {
+    if (e.target && (e.target.id === 'btnExportarPDF' || e.target.closest('#btnExportarPDF'))) {
+        e.preventDefault();
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        let activos = [];
+        
+        try {
+            const response = await fetch('/api/activos', { method: 'GET' });
+            
+            if (response.status === 401 || response.status === 403) {
+                alert("Sesión expirada o no autorizada. Por favor, vuelve a iniciar sesión.");
+                return;
+            }
+            
+            if (!response.ok) throw new Error('Error en la respuesta del servidor');
+            activos = await response.json();
+        } catch (error) {
+            console.error(error);
+            alert("No se pudieron obtener los activos desde el servidor.");
+            return;
+        }
+
+        if (!activos || activos.length === 0) {
+            alert("No hay activos registrados en el inventario para exportar.");
+            return;
+        }
+
+        doc.setFillColor(30, 58, 138); 
+        doc.rect(0, 0, 210, 40, 'F');  
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.text("ITrack | Gestión de Infraestructura", 14, 26);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const fechaHoy = new Date().toLocaleDateString();
+        doc.text(`Fecha de Emisión: ${fechaHoy}`, 140, 18);
+        doc.text("Destinatario: Jefatura de Sistemas", 140, 25);
+        doc.text("Estatus: Reporte Mensual de TI", 140, 32);
+
+        doc.setTextColor(33, 37, 41);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Resumen Ejecutivo de Activos de Cómputo e Infraestructura", 14, 55);
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.text("El presente documento detalla el estado actual, ubicación y categorías de los componentes tecnológicos auditados dentro del sistema centralizado de inventarios de Alimentos de Alta Calidad El Pedregal Toluca.", 14, 63);
+
+        const tablaFilas = activos.map((activo, index) => [
+            index + 1,
+            activo.categoria || 'N/A',
+            activo.type || activo.tipo || 'N/A',
+            activo.marca || 'N/A',
+            activo.serial || 'N/A',
+            activo.area || 'N/A',
+            activo.estado || 'N/A'
+        ]);
+
+        doc.autoTable({
+            startY: 75,
+            head: [['#', 'Categoría', 'Tipo', 'Marca', 'N. Serie', 'Área', 'Estado']],
+            body: tablaFilas,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [30, 58, 138], 
+                textColor: [255, 255, 255],
+                fontStyle: 'bold'
+            },
+            styles: {
+                font: "helvetica",
+                fontSize: 10,
+                cellPadding: 3
+            },
+            alternateRowStyles: {
+                fillColor: [245, 247, 250] 
+            }
+        });
+
+        const finalY = doc.lastAutoTable.finalY + 20;
+        doc.setDrawColor(200, 200, 200);
+        doc.line(14, finalY, 196, finalY); 
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(100, 100, 100);
+        doc.text("Reporte automatizado y certificado por el sistema de control interno ITrack. Confidencialidad de Sistemas Nivel 1.", 14, finalY + 8);
+
+        doc.save(`Reporte_Infraestructura_TI_${fechaHoy.replace(/\//g, '-')}.pdf`);
+    }
+});
