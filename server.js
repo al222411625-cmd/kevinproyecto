@@ -11,12 +11,13 @@ const PORT = process.env.PORT || 3000;
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 
-// CONFIGURACIÓN DE ALMACENAMIENTO PARA MULTER (UNA SOLA DECLARACIÓN)
+// Configuración para almacenar los archivos en la carpeta de subidas
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'public/uploads/'); 
+    cb(null, 'public/uploads/');
   },
   filename: function (req, file, cb) {
+    // Esto les cambia el nombre por la fecha actual para que no se dupliquen
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
@@ -105,6 +106,7 @@ const authUserSchema = new mongoose.Schema({
   username: String,
   nombre: String,
   role: String,
+  email: String,
   passwordHash: String
 });
 
@@ -135,18 +137,21 @@ async function crearUsuariosIniciales() {
         username: 'admin',
         nombre: 'Administrador',
         role: 'admin',
+        email: 'admin@itrack.local',
         passwordHash: bcrypt.hashSync('Admin1234', 10)
       },
       {
         username: 'tecnico',
         nombre: 'Técnico ITrack',
         role: 'technician',
+        email: 'tecnico@itrack.local',
         passwordHash: bcrypt.hashSync('Tech1234', 10)
       },
       {
         username: 'usuario',
         nombre: 'Usuario ITrack',
         role: 'user',
+        email: 'usuario@itrack.local',
         passwordHash: bcrypt.hashSync('User1234', 10)
       }
     ]);
@@ -173,9 +178,13 @@ function requireRole(...roles) {
   };
 }
 
+function generateTempPassword() {
+  return Math.random().toString(36).slice(-6) + Math.random().toString(36).slice(-4);
+}
+
 app.post('/api/register', async (req, res) => {
   try {
-    const { username, password, nombre } = req.body;
+    const { username, password, nombre, email } = req.body;
     if (!username || !password || !nombre) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
     }
@@ -188,6 +197,7 @@ app.post('/api/register', async (req, res) => {
       username: username.toLowerCase(),
       nombre,
       role: 'user',
+      email: email ? email.toLowerCase() : undefined,
       passwordHash
     });
     await nuevoUsuario.save();
@@ -228,6 +238,69 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
+  }
+});
+
+app.post('/api/forgot-password/email', async (req, res) => {
+  try {
+    const { username, email } = req.body;
+    if (!username || !email) {
+      return res.status(400).json({ error: 'Usuario y correo son obligatorios' });
+    }
+    const user = await AuthUser.findOne({ username: username.toLowerCase() });
+    if (!user || !user.email) {
+      return res.status(404).json({ error: 'Usuario no encontrado o sin correo registrado' });
+    }
+    if (user.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(400).json({ error: 'Correo no coincide con el usuario' });
+    }
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res.status(500).json({ error: 'SMTP no configurado en variables de entorno' });
+    }
+    const tempPassword = generateTempPassword();
+    user.passwordHash = await bcrypt.hash(tempPassword, 10);
+    await user.save();
+
+    const html = `
+      <p>Hola ${user.nombre},</p>
+      <p>Se ha generado una nueva contraseña temporal para tu cuenta de ITrack.</p>
+      <p><strong>${tempPassword}</strong></p>
+      <p>Úsala para iniciar sesión y luego cambia tu contraseña en el sistema.</p>
+    `;
+
+    await sendMail(user.email, 'Recuperación de contraseña ITrack', html);
+    res.json({ message: 'Se envió una nueva contraseña a tu correo.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'No se pudo enviar el correo de recuperación' });
+  }
+});
+
+app.post('/api/forgot-password/change', async (req, res) => {
+  try {
+    const { username, email, newPassword } = req.body;
+    if (!username || !newPassword) {
+      return res.status(400).json({ error: 'Usuario y nueva contraseña son obligatorios' });
+    }
+    const user = await AuthUser.findOne({ username: username.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    if (user.email && email && user.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(400).json({ error: 'Correo no coincide con el usuario' });
+    }
+    if (!user.email) {
+      return res.status(400).json({ error: 'El usuario no tiene correo registrado. Contacta al administrador.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ message: 'Contraseña actualizada correctamente. Ahora puedes iniciar sesión.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'No se pudo cambiar la contraseña' });
   }
 });
 
@@ -437,6 +510,9 @@ app.delete('/api/mantenimientos/:id', requireAuth, requireRole('admin'), async (
 });
 
 app.get('/api/test-email', async (req, res) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    return res.status(500).json({ error: 'SMTP no configurado en variables de entorno' });
+  }
   try {
     await sendMail(process.env.EMAIL_USER, 'Prueba de correo ITrack', '<h1>Si ves esto, el correo funciona ✅</h1>');
     res.json({ message: 'Correo enviado' });

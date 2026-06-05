@@ -382,6 +382,40 @@ body::after {
   color: #00e5ff;
 }
 
+.btn-link {
+  color: #7dd3fc;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.btn-link:hover,
+.btn-link:focus {
+  color: #22d3ee;
+  text-decoration: underline;
+}
+
+.form-control {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #e2efff;
+}
+
+.form-control:focus {
+  background: rgba(255,255,255,.12);
+  border-color: #00d9ff;
+  box-shadow: 0 0 0 0.2rem rgba(0,217,255,.15);
+}
+
+.alert {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(0,217,255,.18);
+  color: #d9f8ff;
+}
+
+/* Nuevo estilo para cards de auth */
+.card-border-soft {
+  border: 1px solid rgba(255,255,255,.12) !important;
+}
 
 .logo-pedregal {
   width: 180px;

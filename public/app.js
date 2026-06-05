@@ -26,8 +26,14 @@ async function fetchApi(endpoint, options = {}) {
   const url = apiBase + endpoint;
   const res = await fetch(url, options);
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || 'Error al cargar datos');
+    let errorText = 'Error al cargar datos';
+    try {
+      const json = await res.json();
+      errorText = json.error || JSON.stringify(json);
+    } catch {
+      errorText = await res.text();
+    }
+    throw new Error(errorText || 'Error al cargar datos');
   }
   return res.json();
 }
@@ -64,6 +70,9 @@ function renderAuthScreen(message = '') {
           <label class="form-label">Contraseña</label>
           <input class="form-control" id="loginPassword" name="password" type="password" required />
         </div>
+        <div class="mb-3 text-end">
+          <button type="button" class="btn btn-link p-0" id="forgotPasswordButton">¿Olvidaste tu contraseña?</button>
+        </div>
         <button type="submit" class="btn btn-primary">Entrar</button>
       </form>
     </div>
@@ -80,6 +89,10 @@ function renderAuthScreen(message = '') {
         <div class="mb-3">
           <label class="form-label">Usuario</label>
           <input class="form-control" id="registerUsername" name="username" type="text" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Correo</label>
+          <input class="form-control" id="registerEmail" name="email" type="email" placeholder="usuario@dominio.com" />
         </div>
         <div class="mb-3">
           <label class="form-label">Contraseña</label>
@@ -107,20 +120,19 @@ function renderAuthScreen(message = '') {
       renderAuthScreen('Usuario o contraseña incorrectos.');
     }
   });
+  document.getElementById('forgotPasswordButton').addEventListener('click', renderForgotPasswordScreen);
 
   document.getElementById('registerForm').addEventListener('submit', async event => {
     event.preventDefault();
     try {
       const formData = new FormData(event.target);
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        body: formData
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text);
-      }
-      const result = await response.json();
+      const payload = {
+        nombre: formData.get('nombre'),
+        username: formData.get('username'),
+        password: formData.get('password'),
+        email: formData.get('email')
+      };
+      const result = await postApi('/api/register', payload);
       currentUser = result.user;
       renderApp();
     } catch (error) {
@@ -128,6 +140,96 @@ function renderAuthScreen(message = '') {
       renderAuthScreen(message);
     }
   });
+}
+
+function renderForgotPasswordScreen(message = '') {
+  mainNav.style.display = 'none';
+  dashboardCards.style.display = 'none';
+  contentArea.innerHTML = `
+    <div class="row gy-4 justify-content-center">
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm p-4">
+          <h3 class="card-title">Recuperar contraseña</h3>
+          <p class="text-muted">Ingresa tu usuario y correo. Puedes recibir una contraseña nueva por email o establecer una nueva contraseña directamente.</p>
+          ${message ? renderAlert('info', message) : ''}
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="card border-1 p-3 h-100">
+                <h5>Enviar contraseña por correo</h5>
+                <form id="formForgotEmail">
+                  <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <input class="form-control" id="forgotUsernameEmail" name="username" type="text" required />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Correo</label>
+                    <input class="form-control" id="forgotEmail" name="email" type="email" required />
+                  </div>
+                  <button type="submit" class="btn btn-primary">Enviar por correo</button>
+                </form>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-1 p-3 h-100">
+                <h5>Elegir contraseña nueva</h5>
+                <form id="formForgotChange">
+                  <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <input class="form-control" id="forgotUsernameChange" name="username" type="text" required />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Correo</label>
+                    <input class="form-control" id="forgotEmailChange" name="email" type="email" required />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Nueva contraseña</label>
+                    <input class="form-control" id="forgotNewPassword" name="newPassword" type="password" required />
+                  </div>
+                  <button type="submit" class="btn btn-secondary">Cambiar contraseña</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 text-end">
+            <button type="button" class="btn btn-link" id="backToLogin">Volver al inicio de sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('formForgotEmail').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(event.target);
+      const payload = {
+        username: formData.get('username'),
+        email: formData.get('email')
+      };
+      const result = await postApi('/api/forgot-password/email', payload);
+      renderForgotPasswordScreen(result.message);
+    } catch (error) {
+      renderForgotPasswordScreen(error.message || 'No se pudo enviar el correo.');
+    }
+  });
+
+  document.getElementById('formForgotChange').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(event.target);
+      const payload = {
+        username: formData.get('username'),
+        email: formData.get('email'),
+        newPassword: formData.get('newPassword')
+      };
+      const result = await postApi('/api/forgot-password/change', payload);
+      renderForgotPasswordScreen(result.message);
+    } catch (error) {
+      renderForgotPasswordScreen(error.message || 'No se pudo cambiar la contraseña.');
+    }
+  });
+
+  document.getElementById('backToLogin').addEventListener('click', () => renderAuthScreen());
 }
 
 function renderApp() {

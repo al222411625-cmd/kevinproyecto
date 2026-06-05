@@ -4,7 +4,8 @@
   "description": "ITrack - Sistema web para la gestión y control de activos tecnológicos",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate-emails": "node scripts/add-emails.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
