@@ -8,8 +8,12 @@ const mongoose = require('mongoose');
 const sendMail = require("./mailer");
 const app = express();
 const PORT = process.env.PORT || 3000;
-const nodemailer = require('nodemailer');
 const multer = require('multer');
+
+const smtpConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+console.log(smtpConfigured
+  ? 'ℹ️ SMTP configurado. Recuperación de contraseña por correo habilitada.'
+  : 'ℹ️ SMTP no configurado. Las funciones de recuperación por correo no estarán disponibles.');
 
 // Configuración para almacenar los archivos en la carpeta de subidas
 const storage = multer.diskStorage({
@@ -24,27 +28,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.log('❌ Error Gmail:', error);
-  } else {
-    console.log('✅ Gmail listo');
-  }
-});
 
 mongoose.connect(process.env.MONGODB_URI)
 .then(async () => {
@@ -271,8 +254,8 @@ app.post('/api/forgot-password/email', async (req, res) => {
     await sendMail(user.email, 'Recuperación de contraseña ITrack', html);
     res.json({ message: 'Se envió una nueva contraseña a tu correo.' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo enviar el correo de recuperación' });
+    console.error('ERROR FORGOT EMAIL:', error);
+    res.status(500).json({ error: 'No se pudo enviar el correo de recuperación. ' + (error.message || 'Revisa la configuración SMTP.') });
   }
 });
 

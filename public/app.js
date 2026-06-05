@@ -142,7 +142,7 @@ function renderAuthScreen(message = '') {
   });
 }
 
-function renderForgotPasswordScreen(message = '') {
+function renderForgotPasswordScreen(message = '', type = 'info') {
   mainNav.style.display = 'none';
   dashboardCards.style.display = 'none';
   contentArea.innerHTML = `
@@ -151,7 +151,7 @@ function renderForgotPasswordScreen(message = '') {
         <div class="card border-0 shadow-sm p-4">
           <h3 class="card-title">Recuperar contraseña</h3>
           <p class="text-muted">Ingresa tu usuario y correo. Puedes recibir una contraseña nueva por email o establecer una nueva contraseña directamente.</p>
-          ${message ? renderAlert('info', message) : ''}
+          ${message ? renderAlert(type, message) : ''}
           <div class="row g-4">
             <div class="col-md-6">
               <div class="card border-1 p-3 h-100">
@@ -207,9 +207,9 @@ function renderForgotPasswordScreen(message = '') {
         email: formData.get('email')
       };
       const result = await postApi('/api/forgot-password/email', payload);
-      renderForgotPasswordScreen(result.message);
+      renderForgotPasswordScreen(result.message, 'success');
     } catch (error) {
-      renderForgotPasswordScreen(error.message || 'No se pudo enviar el correo.');
+      renderForgotPasswordScreen(error.message || 'No se pudo enviar el correo.', 'danger');
     }
   });
 
@@ -223,9 +223,9 @@ function renderForgotPasswordScreen(message = '') {
         newPassword: formData.get('newPassword')
       };
       const result = await postApi('/api/forgot-password/change', payload);
-      renderForgotPasswordScreen(result.message);
+      renderForgotPasswordScreen(result.message, 'success');
     } catch (error) {
-      renderForgotPasswordScreen(error.message || 'No se pudo cambiar la contraseña.');
+      renderForgotPasswordScreen(error.message || 'No se pudo cambiar la contraseña.', 'danger');
     }
   });
 
