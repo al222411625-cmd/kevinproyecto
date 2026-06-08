@@ -11,6 +11,9 @@
 
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="/js/qr-scanner.js"></script>
   <header class="hero bg-dark text-white py-5">
     <div class="container">
       <div class="row align-items-center">
@@ -28,6 +31,12 @@
             <button type="button" class="btn btn-outline-light" id="loadAdmin" style="display:none;">Admin</button>
             <button type="button" class="btn btn-warning fw-bold text-dark" id="btnExportarPDF">📄 Exportar PDF Ejecutivo</button>
             <button type="button" class="btn btn-outline-light" id="btnLogout">Cerrar sesión</button>
+          <button onclick="startQRScanner()" 
+        id="btnScanQR"
+        type="button" 
+        class="btn fw-bold d-flex align-items-center gap-2">
+    📷 Escanear QR
+</button>
           </div>
         </div>
         <div class="col-lg-5 text-center">

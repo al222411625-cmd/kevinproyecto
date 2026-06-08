@@ -418,18 +418,45 @@ body::after {
 }
 
 .logo-pedregal {
-  width: 180px;
-  max-width: 220px;
+  width: min(100%, 320px);
+  max-width: 360px;
+  height: auto;
   display: block;
   margin: 0 auto 1rem;
   object-fit: contain;
 
-  filter:
-    drop-shadow(0 0 15px rgba(0,255,255,.25));
-
+  filter: drop-shadow(0 0 18px rgba(0,255,255,.22));
   transition: transform .3s ease, filter .3s ease;
 }
 
 .logo-pedregal:hover {
-  transform: translateY(-2px) scale(1.02);
-  filter: drop-shadow(0 0 25px rgba(0,255,255,.35));
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 22px rgba(0,255,255,.26));
+}
+/* Estilo para botón de QR */
+.btn-success {
+    background-color: #10b981 !important;
+    border-color: #10b981 !important;
+    color: white !important;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #059669 !important;
+    border-color: #059669 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+/* Botón Escanear QR - Estilo personalizado */
+#btnScanQR {
+    background-color: transparent !important;
+    border: 2px solid #10b981 !important;
+    color: #10b981 !important;
+    transition: all 0.3s ease;
+}
+
+#btnScanQR:hover {
+    background-color: #10b981 !important;
+    color: white !important;
+    transform: translateY(-2px);
+}

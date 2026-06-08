@@ -29,17 +29,45 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-mongoose.connect(process.env.MONGODB_URI)
+// Habilitar debug para Mongoose (ver comandos en consola)
+mongoose.set('debug', true);
+
+// Intento de conexión a MongoDB
+console.log('🔗 Intentando conectar a MongoDB con URI:', process.env.MONGODB_URI);
+
+mongoose.connect(process.env.MONGODB_URI, {
+  dbName: process.env.MONGODB_DB || 'itrack',
+  writeConcern: { w: 'majority', j: true, wtimeout: 10000 },
+  readPreference: 'primary',
+  maxPoolSize: 10,
+  minPoolSize: 5,
+  retryWrites: true,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+})
 .then(async () => {
-  console.log('✅ MongoDB conectado');
+  console.log('✅ MongoDB conectado con writeConcern configurado');
+  console.log('📚 Base de datos usada:', mongoose.connection.db.databaseName);
   await crearUsuariosIniciales();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`✅ ITrack server escuchando en http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`❌ Puerto ${PORT} en uso. Detén el proceso que lo ocupa o usa otro puerto.`);
+      console.error('Usa: Get-NetTCPConnection -LocalPort 3000 | Select-Object -ExpandProperty OwningProcess');
+      process.exit(1);
+    }
+    console.error('Server error:', err);
+    process.exit(1);
   });
 })
 .catch(err => {
   console.error('❌ Error conectando MongoDB');
-  console.error(err.message);
+  console.error('Error message:', err.message);
+  console.error('Full error:', err);
+  console.error('Error stack:', err.stack);
 });
 
 // MODELOS MONGODB ORIGINALES
@@ -168,13 +196,18 @@ function generateTempPassword() {
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password, nombre, email } = req.body;
+    console.log('📝 Registro intento:', { username, nombre, email });
+    
     if (!username || !password || !nombre) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
     }
+    
     const usuarioExistente = await AuthUser.findOne({ username: username.toLowerCase() });
     if (usuarioExistente) {
+      console.log('⚠️ Usuario ya existe:', username);
       return res.status(409).json({ error: 'El nombre de usuario ya existe' });
     }
+    
     const passwordHash = await bcrypt.hash(password, 10);
     const nuevoUsuario = new AuthUser({
       username: username.toLowerCase(),
@@ -183,17 +216,30 @@ app.post('/api/register', async (req, res) => {
       email: email ? email.toLowerCase() : undefined,
       passwordHash
     });
-    await nuevoUsuario.save();
+    
+    console.log('💾 Guardando usuario...');
+    const usuarioGuardado = await nuevoUsuario.save();
+    console.log('✅ Usuario guardado. ID:', usuarioGuardado._id);
+    
+    // Verificar que existe en la base de datos
+    const verificar = await AuthUser.findById(usuarioGuardado._id);
+    if (verificar) {
+      console.log('✅ Usuario verificado en BD:', verificar.username);
+    } else {
+      console.error('❌ Usuario NO existe en BD después de guardar!');
+    }
+    
     req.session.user = {
-      id: nuevoUsuario._id,
-      username: nuevoUsuario.username,
-      nombre: nuevoUsuario.nombre,
-      role: nuevoUsuario.role
+      id: usuarioGuardado._id,
+      username: usuarioGuardado.username,
+      nombre: usuarioGuardado.nombre,
+      role: usuarioGuardado.role
     };
     res.status(201).json({ user: req.session.user });
   } catch (error) {
-    console.error('ERROR REGISTER:', error);
-    res.status(500).json({ error: 'No se pudo registrar' });
+    console.error('❌ ERROR REGISTER:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'No se pudo registrar: ' + error.message });
   }
 });
 
@@ -456,6 +502,42 @@ app.post('/api/mantenimientos', requireAuth, requireRole('admin', 'technician', 
   }
 });
 
+app.put('/api/usuarios/:id', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const actualizado = await Usuario.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!actualizado) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(actualizado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/areas/:id', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const actualizada = await Area.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!actualizada) {
+      return res.status(404).json({ error: 'Área no encontrada' });
+    }
+    res.json(actualizada);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/mantenimientos/:id', requireAuth, requireRole('admin', 'technician'), async (req, res) => {
+  try {
+    const actualizado = await Mantenimiento.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!actualizado) {
+      return res.status(404).json({ error: 'Mantenimiento no encontrado' });
+    }
+    res.json(actualizado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/usuarios/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const eliminado = await Usuario.findByIdAndDelete(req.params.id);
@@ -563,6 +645,29 @@ app.put('/api/reportes/:id/solucionar', requireAuth, requireRole('admin', 'techn
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Error solucionando reporte' });
+  }
+});
+// ====================== BUSCAR ACTIVO POR SERIAL (PARA QR) ======================
+app.get('/api/activos/search', requireAuth, async (req, res) => {
+  try {
+    const { serial } = req.query;
+    
+    if (!serial) {
+      return res.status(400).json({ error: 'Se requiere el número de serie' });
+    }
+
+    const activo = await Activo.findOne({ 
+      serial: { $regex: serial, $options: 'i' } 
+    });
+
+    if (!activo) {
+      return res.status(404).json({ error: 'Activo no encontrado' });
+    }
+
+    res.json(activo);
+  } catch (error) {
+    console.error('Error en búsqueda QR:', error);
+    res.status(500).json({ error: 'Error del servidor' });
   }
 });
 
